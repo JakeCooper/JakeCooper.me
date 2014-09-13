@@ -16,4 +16,20 @@
 <file name="phone.png" server="ftp.phx.nearlyfreespeech.net" local="130547034960000000" remote="130549737000000000" Dst="2" />
 <file name="mail.png" server="ftp.phx.nearlyfreespeech.net" local="130547034950000000" remote="130549737000000000" Dst="2" />
 <file name="magnifier.png" server="ftp.phx.nearlyfreespeech.net" local="130547034950000000" remote="130549737000000000" Dst="2" />
+<file name="preloader.gif" server="ssh.phx.nearlyfreespeech.net" local="130547034960000000" remote="130550511920000000" Dst="2" />
+<file name="arrow.png" server="ssh.phx.nearlyfreespeech.net" local="130547034930000000" remote="130550511920000000" Dst="2" />
+<file name="slider-background2.jpg" server="ssh.phx.nearlyfreespeech.net" local="130547034960000000" remote="130550511930000000" Dst="2" />
+<file name="slider-pattern.png" server="ssh.phx.nearlyfreespeech.net" local="130547034960000000" remote="130550511930000000" Dst="2" />
+<file name="magic-pixel.png" server="ssh.phx.nearlyfreespeech.net" local="130547034950000000" remote="130550511940000000" Dst="2" />
+<file name="background-image1.jpg" server="ssh.phx.nearlyfreespeech.net" local="130547034930000000" remote="130550511950000000" Dst="2" />
+<file name="background-testimonials.jpg" server="ssh.phx.nearlyfreespeech.net" local="130547034940000000" remote="130550511960000000" Dst="2" />
+<file name="background-twitter.jpg" server="ssh.phx.nearlyfreespeech.net" local="130547034940000000" remote="130550511970000000" Dst="2" />
+<file name="favicon.ico" server="ssh.phx.nearlyfreespeech.net" local="130547034941999297" remote="130550511570000000" Dst="2" />
+<file name="logo.png" server="ssh.phx.nearlyfreespeech.net" local="130547740170000000" remote="130550512000000000" Dst="2" />
+<file name="Headshot.png" server="ssh.phx.nearlyfreespeech.net" local="130547061020000000" remote="130550512430000000" Dst="2" />
+<file name="marker.png" server="ssh.phx.nearlyfreespeech.net" local="130547034950000000" remote="130550512760000000" Dst="2" />
+<file name="phone.png" server="ssh.phx.nearlyfreespeech.net" local="130547034960000000" remote="130550512770000000" Dst="2" />
+<file name="mail.png" server="ssh.phx.nearlyfreespeech.net" local="130547034950000000" remote="130550512770000000" Dst="2" />
+<file name="magnifier.png" server="ssh.phx.nearlyfreespeech.net" local="130547034950000000" remote="130550512780000000" Dst="2" />
+<file name="news-one.jpg" server="ssh.phx.nearlyfreespeech.net" local="130547034950000000" remote="130550532340000000" Dst="2" />
 </dwsync>

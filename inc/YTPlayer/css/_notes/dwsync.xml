@@ -3,4 +3,7 @@
 <file name="ytp-regular.eot" server="ftp.phx.nearlyfreespeech.net" local="130547035289944244" remote="130549737000000000" Dst="2" />
 <file name="ytp-regular.ttf" server="ftp.phx.nearlyfreespeech.net" local="130547035290304457" remote="130549737000000000" Dst="2" />
 <file name="YTPlayer.css" server="ftp.phx.nearlyfreespeech.net" local="130547035291295433" remote="130549737000000000" Dst="2" />
+<file name="ytp-regular.eot" server="ssh.phx.nearlyfreespeech.net" local="130547035289944244" remote="130550511840000000" Dst="2" />
+<file name="ytp-regular.ttf" server="ssh.phx.nearlyfreespeech.net" local="130547035290304457" remote="130550511840000000" Dst="2" />
+<file name="YTPlayer.css" server="ssh.phx.nearlyfreespeech.net" local="130547035291295433" remote="130550511830000000" Dst="2" />
 </dwsync>

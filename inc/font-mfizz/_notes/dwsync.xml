@@ -4,4 +4,8 @@
 <file name="font-mfizz.woff" server="ftp.phx.nearlyfreespeech.net" local="130190994610000000" remote="130549737000000000" Dst="2" />
 <file name="font-mfizz.ttf" server="ftp.phx.nearlyfreespeech.net" local="130190994610000000" remote="130549737000000000" Dst="2" />
 <file name="font-mfizz.css" server="ftp.phx.nearlyfreespeech.net" local="130190994610000000" remote="130549737000000000" Dst="2" />
+<file name="font-mfizz.eot" server="ssh.phx.nearlyfreespeech.net" local="130190994610000000" remote="130550511700000000" Dst="2" />
+<file name="font-mfizz.woff" server="ssh.phx.nearlyfreespeech.net" local="130190994610000000" remote="130550511700000000" Dst="2" />
+<file name="font-mfizz.ttf" server="ssh.phx.nearlyfreespeech.net" local="130190994610000000" remote="130550511710000000" Dst="2" />
+<file name="font-mfizz.css" server="ssh.phx.nearlyfreespeech.net" local="130190994610000000" remote="130550511690000000" Dst="2" />
 </dwsync>

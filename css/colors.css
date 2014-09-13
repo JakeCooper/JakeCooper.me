@@ -13,7 +13,7 @@ p {
 /*heading border*/
 
 .m-heading-border {
-    background-color: #62b7a4;
+    background-color: #d66969;
 }
 
 /* SPLASH IMAGE */
@@ -119,6 +119,10 @@ p {
 
 .l-skills-section .m-heading-border {
     background-color: #fff;
+}
+
+.l-paralax-section .m-heading-border {
+    background-color: #ffffff;
 }
 
 

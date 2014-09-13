@@ -3,4 +3,7 @@
 <file name="bootstrap.min.css" server="ftp.phx.nearlyfreespeech.net" local="130547034967118258" remote="130549737000000000" Dst="2" />
 <file name="bootstrap-theme.min.css" server="ftp.phx.nearlyfreespeech.net" local="130547034965537143" remote="130549737000000000" Dst="2" />
 <file name="bootstrap-reset.css" server="ftp.phx.nearlyfreespeech.net" local="130547034964245983" remote="130549737000000000" Dst="2" />
+<file name="bootstrap.min.css" server="ssh.phx.nearlyfreespeech.net" local="130547034967118258" remote="130550511620000000" Dst="2" />
+<file name="bootstrap-theme.min.css" server="ssh.phx.nearlyfreespeech.net" local="130547034965537143" remote="130550511670000000" Dst="2" />
+<file name="bootstrap-reset.css" server="ssh.phx.nearlyfreespeech.net" local="130547034964245983" remote="130550511680000000" Dst="2" />
 </dwsync>

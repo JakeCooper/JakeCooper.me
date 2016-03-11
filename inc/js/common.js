@@ -106,16 +106,6 @@ function contact_form_submit(){
     });
 
 
-    /* ==============================================
-     background video load
-     =============================================== */
-
-    jQuery(function() {
-        'use strict';
-        jQuery(".player").mb_YTPlayer();
-    });
-
-
 
     /* ==============================================
      smooth scrolling
@@ -293,7 +283,8 @@ jQuery(window).load(function() {
      =============================================== */
     jQuery('.flexslider-testimonials').flexslider({
         prevText: "",
-        nextText: ""
+        nextText: "",
+        slideshowSpeed: 20000
     });
 
 

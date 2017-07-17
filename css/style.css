@@ -526,19 +526,31 @@ h2 {
 
 .ibm-content {
     position: relative;
-    top:-30px;
+    top:-32px;
 }
 
 .hootsuite-image {
     position:relative;
-    height:25px;
+    height:33px;
     margin-top:7px;
     left:5px;
 }
 
 .hootsuite-content {
     position: relative;
-    top:-30px;
+    top:-35px;
+}
+
+.wolfram-image {
+    position:relative;
+    height:40px;
+    margin-top:7px;
+    left:5px;
+}
+
+.wolfram-content {
+    position: relative;
+    top:-37px;
 }
 
 /* ABOUT ME SECTION */

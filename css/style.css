@@ -1529,3 +1529,7 @@ h2 {
     }
 }
 
+.winner {
+    position: absolute;
+    z-index: 1;
+}

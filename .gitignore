@@ -36,3 +36,8 @@ Icon
 .Trashes
 
 *.xml
+
+.cache
+dist
+yarn.lock
+package-lock.json

@@ -36,8 +36,7 @@ Icon
 .Trashes
 
 *.xml
-
+node_modules/
 .cache
-dist
 yarn.lock
 package-lock.json

@@ -1,0 +1,62 @@
+{
+    "about": [{
+        "short": "Longboard around NYC",
+        "long": "tbd"
+    }],
+    "work": [{
+        "short": "Bloomberg",
+        "long": "tbd"
+    },
+    {
+        "short": "Wolfram",
+        "long": "tbd"
+    },
+    {
+        "short": "Hootsuite",
+        "long": "tbd"
+    },
+    {
+        "short": "IBM",
+        "long": "tbd"
+    }],
+    "projects": [{
+        "short": "Built an overdose response app",
+        "long": "tbd"
+    },
+    {
+        "short": "Hacked OnePlus",
+        "long": "tbd"
+    },
+    {
+        "short": "Wrote drone software",
+        "long": "tbd"
+    },
+    {
+        "short": "Built a Geofenced-IRC",
+        "long": "tbd"
+    },
+    {
+        "short": "Built a platform for teaching code",
+        "long": "tbd"
+    },
+    {
+        "short": "Built a distributed cryptocurrency exchange",
+        "long": "tbd"
+    },
+    {
+        "short": "Built a gambling website",
+        "long": "tbd"
+    },
+    {
+        "short": "Taught a machine how to identify bullies",
+        "long": "tbd"
+    },
+    {
+        "short": "Taught a snake AI to kill other snakes",
+        "long": "tbd"
+    },
+    {
+        "short": "Built an app for mixing drinks",
+        "long": "tbd"
+    }]
+}

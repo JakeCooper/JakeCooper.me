@@ -114,7 +114,7 @@ const Base = () => (
     <div>
         <div className={styles.filter}>
             <div className={styles.upper}>
-                <Router>
+                <Router basename={process.env.PUBLIC_URL}>
                     <div>
                         <div className={styles.header}>
                             <div className={styles.logoContainer}>

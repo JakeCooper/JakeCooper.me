@@ -25,7 +25,7 @@ $text: #fff;
     }
     background-color: $primary;
     transition-duration: .4s;
-    background-size: 16px 16px;
+    background-size: 16px auto;
     margin: 0px 10px;
     background-repeat: no-repeat;
     position: relative;
@@ -163,6 +163,7 @@ $text: #fff;
 
 .facebook {
     @include social;
+    background-size: auto 16px;
     background-image: url(data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjZmZmIiB3aWR0aD0iNTIiIGhlaWdodD0iMTAwIiB2aWV3Qm94PSIwIDAgNTIgMTAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxwYXRoIGQ9Ik0zMy42NjcgOTkuNDlWNTQuMTA4SDQ4Ljk2bDIuMjktMTcuNjg2SDMzLjY2NlYyNS4xM2MwLTUuMTIgMS40MjgtOC42MSA4LjgtOC42MWw5LjQwMi0uMDA1Vi42OTdDNTAuMjQyLjQ4MiA0NC42NiAwIDM4LjE2OSAwIDI0LjYxMSAwIDE1LjMzMSA4LjI0MiAxNS4zMzEgMjMuMzc5djEzLjA0M0gwdjE3LjY4NmgxNS4zMzJWOTkuNDloMTguMzM1Ii8+PC9zdmc+);
 }
 

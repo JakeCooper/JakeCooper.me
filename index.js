@@ -3,10 +3,10 @@ import ReactDOM from 'react-dom';
 
 import Typed from 'typed.js';
 
-import face from './me.png';
-import logo from './logo.png';
+import face from './assets/me.png';
+import logo from './assets/logo.png';
 
-import resume from './JakeCooperResume.pdf';
+import resume from './assets/JakeCooperResume.pdf';
 import me from './me.json';
 
 import styles from './styles.mod.scss';
@@ -14,7 +14,7 @@ import styles from './styles.mod.scss';
 import { Link, Route, BrowserRouter as Router } from 'react-router-dom'
 
 const TypedElement = (accolade) => (
-    `<a href="http://www.google.com"> ${accolade} </a>`
+    `<a href="http://www.google.com" target="_blank"> ${accolade} </a>`
 )
 
 const shuffle = (array) => {
@@ -140,8 +140,8 @@ const Base = () => (
                 <a href="https://twitter.com/RealJakeCooper" target="_blank" className={styles.twitter}></a>
                 <a href="https://facebook.com/JakeElijahCooper" target="_blank" className={styles.facebook}></a>
                 <a href="mailto:Jake@JakeCooper.me" className={styles.email}></a>
-                <a href="https://linkedin.com/thejakecooper" target="_blank" className={styles.linkedin}></a>
-                <a href="https://github.com/thejakecooper" target="_blank" className={styles.github}></a>
+                <a href="https://www.linkedin.com/in/thejakecooper/" target="_blank" className={styles.linkedin}></a>
+                <a href="https://github.com/jakecooper" target="_blank" className={styles.github}></a>
             </div>
             <div className={styles.footer}>
                 Made with 🍁 in Canada

@@ -110,6 +110,8 @@ const Button = (props) => {
     )
 }
 
+const enableNav = false;
+
 const Base = () => (
     <div>
         <div className={styles.filter}>
@@ -119,7 +121,7 @@ const Base = () => (
                         <div className={styles.header}>
                             <div className={styles.logoContainer}>
                                 <img className={styles.logo} src={logo}/>
-                                <Navigator />
+                                {enableNav && <Navigator />}
                             </div>
                         </div>
                         <div className={styles.main}>

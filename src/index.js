@@ -128,7 +128,7 @@ const Base = () => (
     <div>
         <div className={styles.upper}>
             <Router basename={process.env.PUBLIC_URL}>
-                <div>
+                <div className={styles.routerContainer}>
                     <div className={styles.header}>
                         <div className={styles.logoContainer}>
                             <img className={styles.logo} src={logoSrc}/>

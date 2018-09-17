@@ -82,6 +82,33 @@ $text: #fff;
     border: 5px solid $accent;
 }
 
+@media only screen and (max-width: 760px) {
+    #root {
+        overflow: scroll;
+    }
+    .content {
+        flex-direction: column;
+    }
+
+    .typer {
+        font-size: 16px;
+    }
+
+    .button {
+        margin: 0 auto;
+    }
+    .content {
+        .rightContent {
+            margin: 0;
+        }
+
+        .leftContent {
+            margin: 30px;
+        }
+    }
+
+}
+
 .upper {
     // background-image: url('./background.jpg');
     // background-size: cover;
@@ -91,7 +118,7 @@ $text: #fff;
 
     height: 70vh;
     width: 100%;
-    display: inline-block;
+    display: flex;
 }
 
 .main {
@@ -116,6 +143,10 @@ $text: #fff;
     display: flex;
 }
 
+.routerContainer {
+    width: 100%;
+}
+
 .button {
     @include Button;
     padding: 15px 20px;
@@ -133,13 +164,12 @@ $text: #fff;
 }
 
 .leftContent {
-    width: 50%;
+    margin: 60px;
 
 }
 
 .rightContent {
-    width: 50%;
-    @include flex;
+    margin: 60px;
 }
 
 .intro {

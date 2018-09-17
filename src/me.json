@@ -1,62 +1,82 @@
 {
     "about": [{
         "short": "Longboard around NYC",
-        "long": "tbd"
+        "long": "tbd",
+        "link": ""
     }],
     "work": [{
         "short": "Bloomberg",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "https://www.bloomberg.com/"
     },
     {
         "short": "Wolfram",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "http://www.wolframalpha.com/"
     },
     {
         "short": "Hootsuite",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "https://hootsuite.com/"
     },
     {
         "short": "IBM",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "https://www.ibm.com/us-en/"
     }],
     "projects": [{
         "short": "Built an overdose response app",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "https://github.com/Antidose"
     },
     {
         "short": "Hacked OnePlus",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "https://medium.com/@JakeCooper/how-i-hacked-the-oneplus-reservation-system-120ea1a7ad82"
     },
     {
         "short": "Wrote drone software",
-        "long": "tbd"
+        "long": "tbd",
+        "link": ""
     },
     {
         "short": "Built a Geofenced-IRC",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "https://devpost.com/software/locale-ppv4a"
     },
     {
         "short": "Built a platform for teaching code",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "http://plzteach.me/"
     },
     {
-        "short": "Built a distributed cryptocurrency exchange",
-        "long": "tbd"
+        "short": "Built a distributed crypto exchange",
+        "long": "tbd",
+        "link": "https://github.com/distributeddesigns"
     },
     {
         "short": "Built a gambling website",
-        "long": "tbd"
+        "long": "tbd",
+        "link": ""
     },
     {
-        "short": "Taught a machine how to identify bullies",
-        "long": "tbd"
+        "short": "Taught an AI to stop cyberbullying",
+        "long": "tbd",
+        "link": "https://devpost.com/software/notifai"
     },
     {
-        "short": "Taught a snake AI to kill other snakes",
-        "long": "tbd"
+        "short": "built a snake ai",
+        "long": "tbd",
+        "link": "https://github.com/andreirtaylor/yournewdad"
     },
     {
         "short": "Built an app for mixing drinks",
-        "long": "tbd"
+        "long": "tbd",
+        "link": "https://devpost.com/software/bartendr"
+    },
+    {
+        "short": "Started a hackathon",
+        "long": "tbd",
+        "link": "http://www.hackuvic.com/"
     }]
 }

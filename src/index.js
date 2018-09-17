@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
+import classNames from 'classnames';
+
 import Typed from 'typed.js';
 
 import face from './assets/me.png';
@@ -13,9 +15,11 @@ import styles from './styles.mod.scss';
 
 import { Link, Route, BrowserRouter as Router } from 'react-router-dom'
 
-const TypedElement = (accolade) => (
-    `<a href="http://www.google.com" target="_blank"> ${accolade} </a>`
-)
+const TypedElement = (accolade) => {
+    return accolade;
+    // `<a href="${accolade.link}" target="_blank"> ${accolade} </a>` 
+}
+
 
 const shuffle = (array) => {
     // Fisher Yates Shuffle
@@ -46,7 +50,7 @@ class Typer extends React.Component {
     render() {
         return (
             <h3>
-                <a ref={(el) => this.el = el}/>
+                <a className={styles.typer} ref={(el) => this.el = el}/>
             </h3>
         )
     }
@@ -60,16 +64,18 @@ const home = () => (
                 Hey, I'm Jake
             </h1>
             <h3 className={styles.about}>
-                I'm currently a software engineer @{me['work'][0].short} in NYC 🍎
+                I'm a software engineer @{me['work'][0].short} in NYC 🍎
             </h3>
             <Typer />
-            <Button onClick={() => window.location = resume}>
+            <Button onClick={() => window.location = resume} className={styles.resumeBtn}>
                 Check out my resume
             </Button>
         </div>
-        <div className={styles.rightContent}>
-            <img className={styles.me} src={face} />
-        </div>
+        {!mobile ? 
+            <div className={styles.rightContent}>
+                <img className={styles.me} src={face} />
+            </div> : null}
+        
     </div>
 )
 
@@ -104,39 +110,42 @@ const Navigator = () => (
 
 const Button = (props) => {
     return (
-        <div className={styles.button} onClick={props.onClick}>
+        <div className={classNames(styles.button, props.className)} onClick={props.onClick}>
             {props.children}
         </div>
     )
 }
 
+//760
+
 const enableNav = false;
+
+const mobile = window.outerWidth < 730;
+
+const logoSrc = mobile ? null : logo;
 
 const Base = () => (
     <div>
-        <div className={styles.filter}>
-            <div className={styles.upper}>
-                <Router basename={process.env.PUBLIC_URL}>
-                    <div>
-                        <div className={styles.header}>
-                            <div className={styles.logoContainer}>
-                                <img className={styles.logo} src={logo}/>
-                                {enableNav && <Navigator />}
-                            </div>
+        <div className={styles.upper}>
+            <Router basename={process.env.PUBLIC_URL}>
+                <div>
+                    <div className={styles.header}>
+                        <div className={styles.logoContainer}>
+                            <img className={styles.logo} src={logoSrc}/>
+                            {enableNav && <Navigator />}
                         </div>
-                        <div className={styles.main}>
-                            <div className={styles.flexContent}>
-                                <Route exact path="/" component={home}/>
-                                <Route path="/about" component={about} />
-                                <Route path="/work" component={work} />
-                                <Route path="/projects" component={projects} />
-                            </div>
+                    </div>
+                    <div className={styles.main}>
+                        <div className={styles.flexContent}>
+                            <Route exact path="/" component={home}/>
+                            <Route path="/about" component={about} />
+                            <Route path="/work" component={work} />
+                            <Route path="/projects" component={projects} />
                         </div>
-                    </div>          
-                </Router>
-            </div>
-        </div>
-        
+                    </div>
+                </div>          
+            </Router>
+        </div>        
         <div className={styles.lower}>
             <div className={styles.socialbar}>
                 <a href="https://twitter.com/RealJakeCooper" target="_blank" className={styles.twitter}></a>

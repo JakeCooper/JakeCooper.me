@@ -116,11 +116,11 @@ const Button = (props) => {
     )
 }
 
-//760
+
 
 const enableNav = false;
 
-const mobile = window.outerWidth < 730;
+const mobile = window.outerWidth < 760; //760
 
 const logoSrc = mobile ? null : logo;
 

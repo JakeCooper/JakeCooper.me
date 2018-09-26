@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
+import Darklaunch from 'darklaunch-js';
+
 import classNames from 'classnames';
 
 import Typed from 'typed.js';
@@ -116,9 +118,7 @@ const Button = (props) => {
     )
 }
 
-
-
-const enableNav = false;
+const enableNav = Darklaunch.isEnabled("navEnabled");
 
 const mobile = window.outerWidth < 760; //760
 

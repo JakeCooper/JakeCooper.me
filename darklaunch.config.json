@@ -1,3 +1,4 @@
 {
-    "url": "https://darklaunch.herokuapp.com"
+    "url": "https://darklaunch.herokuapp.com",
+    "enableStreaming": true
 }

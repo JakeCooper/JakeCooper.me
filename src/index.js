@@ -43,8 +43,8 @@ const accolades = () => {
 
 class Typer extends React.Component {
     componentDidMount() {
-        ReactGA.initialize('UA-125720993-1');
-        ReactGA.pageview("home");
+        ReactGA.initialize('UA-125720993-2');
+        ReactGA.pageview('/home');
         new Typed(this.el, {
             strings: accolades(),
             typeSpeed: 50,

@@ -17,6 +17,8 @@ import styles from './styles.mod.scss';
 
 import { Link, Route, BrowserRouter as Router } from 'react-router-dom'
 
+import ReactGA from 'react-ga';
+
 const TypedElement = (accolade) => {
     return accolade;
     // `<a href="${accolade.link}" target="_blank"> ${accolade} </a>` 
@@ -41,6 +43,8 @@ const accolades = () => {
 
 class Typer extends React.Component {
     componentDidMount() {
+        ReactGA.initialize('UA-125720993-1');
+        ReactGA.pageview("home");
         new Typed(this.el, {
             strings: accolades(),
             typeSpeed: 50,

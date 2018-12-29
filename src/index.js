@@ -64,7 +64,7 @@ const home = () => (
                 Hey, I'm Jake
             </h1>
             <h3 className={styles.about}>
-                I'm a software engineer @{me['work'][0].short} in NYC 🍎
+                I'm a software engineer @{me['work'][0].short} in San Francisco
             </h3>
             <Typer />
             <Button onClick={() => window.location = resume} className={styles.resumeBtn}>

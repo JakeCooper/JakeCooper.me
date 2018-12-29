@@ -5,6 +5,11 @@
         "link": ""
     }],
     "work": [{
+        "short": "Uber",
+        "long": "tbd",
+        "link": "https://www.Uber.com/"
+    },    
+    {
         "short": "Bloomberg",
         "long": "tbd",
         "link": "https://www.bloomberg.com/"
@@ -78,5 +83,40 @@
         "short": "Started a hackathon",
         "long": "tbd",
         "link": "http://www.hackuvic.com/"
-    }]
+    }],
+    "books": {
+        "2018": [
+            {
+                "name": "The Subtle Art of Not Giving a Fuck",
+                "rating": "8/10"
+            },
+            {
+                "name": "How to Die By Seneca",
+                "rating": "7/10"
+            },
+            {
+                "name": "The Hard Thing about Hard Things",
+                "rating": "8/10"
+            },
+            {
+                "name": "Principles by Ray Dalio",
+                "rating": "9/10"
+            },
+            {
+                "name": "Meditations by Markus Aurelius",
+                "rating": "8/10"
+            },
+            {
+                "name": "The Infinite Tortoise",
+                "rating": "8/10"
+            }
+
+        ],
+        "Pre-2018": [
+            {
+                "name": "Elon Musk",
+                "rating": "8/10"
+            }
+        ]
+    }
 }

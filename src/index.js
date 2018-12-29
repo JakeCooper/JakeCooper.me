@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 
+import Darklaunch from 'darklaunch-js';
+
 import classNames from 'classnames';
 
 import Typed from 'typed.js';
@@ -14,6 +16,8 @@ import me from './me.json';
 import styles from './styles.mod.scss';
 
 import { Link, Route, BrowserRouter as Router } from 'react-router-dom'
+
+import ReactGA from 'react-ga';
 
 const TypedElement = (accolade) => {
     return accolade;
@@ -39,6 +43,8 @@ const accolades = () => {
 
 class Typer extends React.Component {
     componentDidMount() {
+        ReactGA.initialize('UA-125720993-2');
+        ReactGA.pageview('/home');
         new Typed(this.el, {
             strings: accolades(),
             typeSpeed: 50,
@@ -116,9 +122,7 @@ const Button = (props) => {
     )
 }
 
-
-
-const enableNav = false;
+const enableNav = false; // Darklaunch.isEnabled("navEnabled");
 
 const mobile = window.outerWidth < 760; //760
 

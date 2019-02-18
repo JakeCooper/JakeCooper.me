@@ -122,7 +122,7 @@ const Button = (props) => {
     )
 }
 
-const enableNav = false; // Darklaunch.isEnabled("navEnabled");
+const enableNav = Darklaunch.isEnabled("navEnabled");
 
 const mobile = window.outerWidth < 760; //760
 

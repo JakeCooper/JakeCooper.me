@@ -324,7 +324,7 @@ checkPropTypes.resetWarningCache = function () {
 
 module.exports = checkPropTypes;
 },{"./lib/ReactPropTypesSecret":"../node_modules/prop-types/lib/ReactPropTypesSecret.js"}],"../node_modules/react/cjs/react.development.js":[function(require,module,exports) {
-/** @license React v16.8.2
+/** @license React v16.8.6
  * react.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -343,7 +343,7 @@ if ("development" !== "production") {
     var checkPropTypes = require('prop-types/checkPropTypes'); // TODO: this is special because it gets imported during build.
 
 
-    var ReactVersion = '16.8.2'; // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
+    var ReactVersion = '16.8.6'; // The Symbol used to tag the ReactElement-like types. If there is no native Symbol
     // nor polyfill, then a plain number is used for performance.
 
     var hasSymbol = typeof Symbol === 'function' && Symbol.for;
@@ -1793,7 +1793,7 @@ if ("development" !== "production") {
 
     function resolveDispatcher() {
       var dispatcher = ReactCurrentDispatcher.current;
-      !(dispatcher !== null) ? invariant(false, 'Hooks can only be called inside the body of a function component. (https://fb.me/react-invalid-hook-call)') : void 0;
+      !(dispatcher !== null) ? invariant(false, 'Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:\n1. You might have mismatching versions of React and the renderer (such as React DOM)\n2. You might be breaking the Rules of Hooks\n3. You might have more than one copy of React in the same app\nSee https://fb.me/react-invalid-hook-call for tips about how to debug and fix this problem.') : void 0;
       return dispatcher;
     }
 
@@ -2255,7 +2255,7 @@ if ("development" === 'production') {
 }
 },{"./cjs/react.development.js":"../node_modules/react/cjs/react.development.js"}],"../node_modules/scheduler/cjs/scheduler.development.js":[function(require,module,exports) {
 var global = arguments[3];
-/** @license React v0.13.2
+/** @license React v0.13.6
  * scheduler.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -2975,7 +2975,7 @@ if ("development" === 'production') {
   module.exports = require('./cjs/scheduler.development.js');
 }
 },{"./cjs/scheduler.development.js":"../node_modules/scheduler/cjs/scheduler.development.js"}],"../node_modules/scheduler/cjs/scheduler-tracing.development.js":[function(require,module,exports) {
-/** @license React v0.13.2
+/** @license React v0.13.6
  * scheduler-tracing.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -3371,7 +3371,7 @@ if ("development" === 'production') {
   module.exports = require('./cjs/scheduler-tracing.development.js');
 }
 },{"./cjs/scheduler-tracing.development.js":"../node_modules/scheduler/cjs/scheduler-tracing.development.js"}],"../node_modules/react-dom/cjs/react-dom.development.js":[function(require,module,exports) {
-/** @license React v16.8.2
+/** @license React v16.8.6
  * react-dom.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -8935,16 +8935,29 @@ if ("development" !== "production") {
       return node && node.ownerDocument && containsNode(node.ownerDocument.documentElement, node);
     }
 
+    function isSameOriginFrame(iframe) {
+      try {
+        // Accessing the contentDocument of a HTMLIframeElement can cause the browser
+        // to throw, e.g. if it has a cross-origin src attribute.
+        // Safari will show an error in the console when the access results in "Blocked a frame with origin". e.g:
+        // iframe.contentDocument.defaultView;
+        // A safety way is to access one of the cross origin properties: Window or Location
+        // Which might result in "SecurityError" DOM Exception and it is compatible to Safari.
+        // https://html.spec.whatwg.org/multipage/browsers.html#integration-with-idl
+        return typeof iframe.contentWindow.location.href === 'string';
+      } catch (err) {
+        return false;
+      }
+    }
+
     function getActiveElementDeep() {
       var win = window;
       var element = getActiveElement();
 
       while (element instanceof win.HTMLIFrameElement) {
-        // Accessing the contentDocument of a HTMLIframeElement can cause the browser
-        // to throw, e.g. if it has a cross-origin src attribute
-        try {
-          win = element.contentDocument.defaultView;
-        } catch (e) {
+        if (isSameOriginFrame(element)) {
+          win = element.contentWindow;
+        } else {
           return element;
         }
 
@@ -11307,15 +11320,27 @@ if ("development" !== "production") {
           // Separate else branch instead of using `props.is || undefined` above because of a Firefox bug.
           // See discussion in https://github.com/facebook/react/pull/6896
           // and discussion in https://bugzilla.mozilla.org/show_bug.cgi?id=1276240
-          domElement = ownerDocument.createElement(type); // Normally attributes are assigned in `setInitialDOMProperties`, however the `multiple`
-          // attribute on `select`s needs to be added before `option`s are inserted. This prevents
-          // a bug where the `select` does not scroll to the correct option because singular
-          // `select` elements automatically pick the first item.
+          domElement = ownerDocument.createElement(type); // Normally attributes are assigned in `setInitialDOMProperties`, however the `multiple` and `size`
+          // attributes on `select`s needs to be added before `option`s are inserted.
+          // This prevents:
+          // - a bug where the `select` does not scroll to the correct option because singular
+          //  `select` elements automatically pick the first item #13222
+          // - a bug where the `select` set the first item as selected despite the `size` attribute #14239
           // See https://github.com/facebook/react/issues/13222
+          // and https://github.com/facebook/react/issues/14239
 
-          if (type === 'select' && props.multiple) {
+          if (type === 'select') {
             var node = domElement;
-            node.multiple = true;
+
+            if (props.multiple) {
+              node.multiple = true;
+            } else if (props.size) {
+              // Setting a size greater than 1 causes a select to behave like `multiple=true`, where
+              // it is possible that no option is selected.
+              //
+              // This is only necessary when a select in "single selection mode".
+              node.size = props.size;
+            }
           }
         }
       } else {
@@ -13796,6 +13821,7 @@ if ("development" !== "production") {
         this._debugSource = null;
         this._debugOwner = null;
         this._debugIsCurrentlyTiming = false;
+        this._debugHookTypes = null;
 
         if (!hasBadMapPolyfill && typeof Object.preventExtensions === 'function') {
           Object.preventExtensions(this);
@@ -13867,6 +13893,7 @@ if ("development" !== "production") {
           workInProgress._debugID = current._debugID;
           workInProgress._debugSource = current._debugSource;
           workInProgress._debugOwner = current._debugOwner;
+          workInProgress._debugHookTypes = current._debugHookTypes;
         }
         workInProgress.alternate = current;
         current.alternate = workInProgress;
@@ -14136,6 +14163,7 @@ if ("development" !== "production") {
       target._debugSource = source._debugSource;
       target._debugOwner = source._debugOwner;
       target._debugIsCurrentlyTiming = source._debugIsCurrentlyTiming;
+      target._debugHookTypes = source._debugHookTypes;
       return target;
     } // TODO: This should be lifted into the renderer.
     // The following attributes are only used by interaction tracing builds.
@@ -15086,14 +15114,34 @@ if ("development" !== "production") {
       var unmaskedContext = emptyContextObject;
       var context = null;
       var contextType = ctor.contextType;
+      {
+        if ('contextType' in ctor) {
+          var isValid = // Allow null for conditional declaration
+          contextType === null || contextType !== undefined && contextType.$$typeof === REACT_CONTEXT_TYPE && contextType._context === undefined; // Not a <Context.Consumer>
 
-      if (typeof contextType === 'object' && contextType !== null) {
-        {
-          if (contextType.$$typeof !== REACT_CONTEXT_TYPE && !didWarnAboutInvalidateContextType.has(ctor)) {
+          if (!isValid && !didWarnAboutInvalidateContextType.has(ctor)) {
             didWarnAboutInvalidateContextType.add(ctor);
-            warningWithoutStack$1(false, '%s defines an invalid contextType. ' + 'contextType should point to the Context object returned by React.createContext(). ' + 'Did you accidentally pass the Context.Provider instead?', getComponentName(ctor) || 'Component');
+            var addendum = '';
+
+            if (contextType === undefined) {
+              addendum = ' However, it is set to undefined. ' + 'This can be caused by a typo or by mixing up named and default imports. ' + 'This can also happen due to a circular dependency, so ' + 'try moving the createContext() call to a separate file.';
+            } else if (typeof contextType !== 'object') {
+              addendum = ' However, it is set to a ' + typeof contextType + '.';
+            } else if (contextType.$$typeof === REACT_PROVIDER_TYPE) {
+              addendum = ' Did you accidentally pass the Context.Provider instead?';
+            } else if (contextType._context !== undefined) {
+              // <Context.Consumer>
+              addendum = ' Did you accidentally pass the Context.Consumer instead?';
+            } else {
+              addendum = ' However, it is set to an object with keys {' + Object.keys(contextType).join(', ') + '}.';
+            }
+
+            warningWithoutStack$1(false, '%s defines an invalid contextType. ' + 'contextType should point to the Context object returned by React.createContext().%s', getComponentName(ctor) || 'Component', addendum);
           }
         }
+      }
+
+      if (typeof contextType === 'object' && contextType !== null) {
         context = readContext(contextType);
       } else {
         unmaskedContext = getUnmaskedContext(workInProgress, ctor, true);
@@ -16616,7 +16664,6 @@ if ("development" !== "production") {
     // work-in-progress hook list is a new list that will be added to the
     // work-in-progress fiber.
 
-    var firstCurrentHook = null;
     var currentHook = null;
     var nextCurrentHook = null;
     var firstWorkInProgressHook = null;
@@ -16640,44 +16687,72 @@ if ("development" !== "production") {
     var numberOfReRenders = 0;
     var RE_RENDER_LIMIT = 25; // In DEV, this is the name of the currently executing primitive hook
 
-    var currentHookNameInDev = null;
+    var currentHookNameInDev = null; // In DEV, this list ensures that hooks are called in the same order between renders.
+    // The list stores the order of hooks used during the initial render (mount).
+    // Subsequent renders (updates) reference this list.
 
-    function warnOnHookMismatchInDev() {
+    var hookTypesDev = null;
+    var hookTypesUpdateIndexDev = -1;
+
+    function mountHookTypesDev() {
+      {
+        var hookName = currentHookNameInDev;
+
+        if (hookTypesDev === null) {
+          hookTypesDev = [hookName];
+        } else {
+          hookTypesDev.push(hookName);
+        }
+      }
+    }
+
+    function updateHookTypesDev() {
+      {
+        var hookName = currentHookNameInDev;
+
+        if (hookTypesDev !== null) {
+          hookTypesUpdateIndexDev++;
+
+          if (hookTypesDev[hookTypesUpdateIndexDev] !== hookName) {
+            warnOnHookMismatchInDev(hookName);
+          }
+        }
+      }
+    }
+
+    function warnOnHookMismatchInDev(currentHookName) {
       {
         var componentName = getComponentName(currentlyRenderingFiber$1.type);
 
         if (!didWarnAboutMismatchedHooksForComponent.has(componentName)) {
           didWarnAboutMismatchedHooksForComponent.add(componentName);
-          var secondColumnStart = 22;
-          var table = '';
-          var prevHook = firstCurrentHook;
-          var nextHook = firstWorkInProgressHook;
-          var n = 1;
 
-          while (prevHook !== null && nextHook !== null) {
-            var oldHookName = prevHook._debugType;
-            var newHookName = nextHook._debugType;
-            var row = n + '. ' + oldHookName; // Extra space so second column lines up
-            // lol @ IE not supporting String#repeat
+          if (hookTypesDev !== null) {
+            var table = '';
+            var secondColumnStart = 30;
 
-            while (row.length < secondColumnStart) {
-              row += ' ';
+            for (var i = 0; i <= hookTypesUpdateIndexDev; i++) {
+              var oldHookName = hookTypesDev[i];
+              var newHookName = i === hookTypesUpdateIndexDev ? currentHookName : oldHookName;
+              var row = i + 1 + '. ' + oldHookName; // Extra space so second column lines up
+              // lol @ IE not supporting String#repeat
+
+              while (row.length < secondColumnStart) {
+                row += ' ';
+              }
+
+              row += newHookName + '\n';
+              table += row;
             }
 
-            row += newHookName + '\n';
-            table += row;
-            prevHook = prevHook.next;
-            nextHook = nextHook.next;
-            n++;
+            warning$1(false, 'React has detected a change in the order of Hooks called by %s. ' + 'This will lead to bugs and errors if not fixed. ' + 'For more information, read the Rules of Hooks: https://fb.me/rules-of-hooks\n\n' + '   Previous render            Next render\n' + '   ------------------------------------------------------\n' + '%s' + '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n', componentName, table);
           }
-
-          warning$1(false, 'React has detected a change in the order of Hooks called by %s. ' + 'This will lead to bugs and errors if not fixed. ' + 'For more information, read the Rules of Hooks: https://fb.me/rules-of-hooks\n\n' + '   Previous render    Next render\n' + '   -------------------------------\n' + '%s' + '   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n', componentName, table);
         }
       }
     }
 
     function throwInvalidHookError() {
-      invariant(false, 'Hooks can only be called inside the body of a function component. (https://fb.me/react-invalid-hook-call)');
+      invariant(false, 'Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:\n1. You might have mismatching versions of React and the renderer (such as React DOM)\n2. You might be breaking the Rules of Hooks\n3. You might have more than one copy of React in the same app\nSee https://fb.me/react-invalid-hook-call for tips about how to debug and fix this problem.');
     }
 
     function areHookInputsEqual(nextDeps, prevDeps) {
@@ -16710,7 +16785,11 @@ if ("development" !== "production") {
     function renderWithHooks(current, workInProgress, Component, props, refOrContext, nextRenderExpirationTime) {
       renderExpirationTime = nextRenderExpirationTime;
       currentlyRenderingFiber$1 = workInProgress;
-      firstCurrentHook = nextCurrentHook = current !== null ? current.memoizedState : null; // The following should have already been reset
+      nextCurrentHook = current !== null ? current.memoizedState : null;
+      {
+        hookTypesDev = current !== null ? current._debugHookTypes : null;
+        hookTypesUpdateIndexDev = -1;
+      } // The following should have already been reset
       // currentHook = null;
       // workInProgressHook = null;
       // remainingExpirationTime = NoWork;
@@ -16719,9 +16798,26 @@ if ("development" !== "production") {
       // renderPhaseUpdates = null;
       // numberOfReRenders = 0;
       // sideEffectTag = 0;
+      // TODO Warn if no hooks are used at all during mount, then some are used during update.
+      // Currently we will identify the update render as a mount because nextCurrentHook === null.
+      // This is tricky because it's valid for certain types of components (e.g. React.lazy)
+      // Using nextCurrentHook to differentiate between mount/update only works if at least one stateful hook is used.
+      // Non-stateful hooks (e.g. context) don't get added to memoizedState,
+      // so nextCurrentHook would be null during updates and mounts.
 
       {
-        ReactCurrentDispatcher$1.current = nextCurrentHook === null ? HooksDispatcherOnMountInDEV : HooksDispatcherOnUpdateInDEV;
+        if (nextCurrentHook !== null) {
+          ReactCurrentDispatcher$1.current = HooksDispatcherOnUpdateInDEV;
+        } else if (hookTypesDev !== null) {
+          // This dispatcher handles an edge case where a component is updating,
+          // but no stateful hooks have been used.
+          // We want to match the production code behavior (which will use HooksDispatcherOnMount),
+          // but with the extra DEV validation to ensure hooks ordering hasn't changed.
+          // This dispatcher does that.
+          ReactCurrentDispatcher$1.current = HooksDispatcherOnMountWithHookTypesInDEV;
+        } else {
+          ReactCurrentDispatcher$1.current = HooksDispatcherOnMountInDEV;
+        }
       }
       var children = Component(props, refOrContext);
 
@@ -16730,23 +16826,24 @@ if ("development" !== "production") {
           didScheduleRenderPhaseUpdate = false;
           numberOfReRenders += 1; // Start over from the beginning of the list
 
-          firstCurrentHook = nextCurrentHook = current !== null ? current.memoizedState : null;
+          nextCurrentHook = current !== null ? current.memoizedState : null;
           nextWorkInProgressHook = firstWorkInProgressHook;
           currentHook = null;
           workInProgressHook = null;
           componentUpdateQueue = null;
+          {
+            // Also validate hook order for cascading updates.
+            hookTypesUpdateIndexDev = -1;
+          }
           ReactCurrentDispatcher$1.current = HooksDispatcherOnUpdateInDEV;
           children = Component(props, refOrContext);
         } while (didScheduleRenderPhaseUpdate);
 
         renderPhaseUpdates = null;
         numberOfReRenders = 0;
-      }
-
-      {
-        currentHookNameInDev = null;
       } // We can assume the previous dispatcher is always this one, since we set it
       // at the beginning of the render phase and there's no re-entrancy.
+
 
       ReactCurrentDispatcher$1.current = ContextOnlyDispatcher;
       var renderedWork = currentlyRenderingFiber$1;
@@ -16754,15 +16851,24 @@ if ("development" !== "production") {
       renderedWork.expirationTime = remainingExpirationTime;
       renderedWork.updateQueue = componentUpdateQueue;
       renderedWork.effectTag |= sideEffectTag;
+      {
+        renderedWork._debugHookTypes = hookTypesDev;
+      } // This check uses currentHook so that it works the same in DEV and prod bundles.
+      // hookTypesDev could catch more cases (e.g. context) but only in DEV bundles.
+
       var didRenderTooFewHooks = currentHook !== null && currentHook.next !== null;
       renderExpirationTime = NoWork;
       currentlyRenderingFiber$1 = null;
-      firstCurrentHook = null;
       currentHook = null;
       nextCurrentHook = null;
       firstWorkInProgressHook = null;
       workInProgressHook = null;
       nextWorkInProgressHook = null;
+      {
+        currentHookNameInDev = null;
+        hookTypesDev = null;
+        hookTypesUpdateIndexDev = -1;
+      }
       remainingExpirationTime = NoWork;
       componentUpdateQueue = null;
       sideEffectTag = 0; // These were reset above
@@ -16792,18 +16898,19 @@ if ("development" !== "production") {
 
       renderExpirationTime = NoWork;
       currentlyRenderingFiber$1 = null;
-      firstCurrentHook = null;
       currentHook = null;
       nextCurrentHook = null;
       firstWorkInProgressHook = null;
       workInProgressHook = null;
       nextWorkInProgressHook = null;
+      {
+        hookTypesDev = null;
+        hookTypesUpdateIndexDev = -1;
+        currentHookNameInDev = null;
+      }
       remainingExpirationTime = NoWork;
       componentUpdateQueue = null;
       sideEffectTag = 0;
-      {
-        currentHookNameInDev = null;
-      }
       didScheduleRenderPhaseUpdate = false;
       renderPhaseUpdates = null;
       numberOfReRenders = 0;
@@ -16817,9 +16924,6 @@ if ("development" !== "production") {
         baseUpdate: null,
         next: null
       };
-      {
-        hook._debugType = currentHookNameInDev;
-      }
 
       if (workInProgressHook === null) {
         // This is the first hook in the list
@@ -16865,13 +16969,6 @@ if ("development" !== "production") {
         }
 
         nextCurrentHook = currentHook.next;
-        {
-          newHook._debugType = currentHookNameInDev;
-
-          if (currentHookNameInDev !== currentHook._debugType) {
-            warnOnHookMismatchInDev();
-          }
-        }
       }
 
       return workInProgressHook;
@@ -16885,20 +16982,6 @@ if ("development" !== "production") {
 
     function basicStateReducer(state, action) {
       return typeof action === 'function' ? action(state) : action;
-    }
-
-    function mountContext(context, observedBits) {
-      {
-        mountWorkInProgressHook();
-      }
-      return readContext(context, observedBits);
-    }
-
-    function updateContext(context, observedBits) {
-      {
-        updateWorkInProgressHook();
-      }
-      return readContext(context, observedBits);
     }
 
     function mountReducer(reducer, initialArg, init) {
@@ -16915,8 +16998,8 @@ if ("development" !== "production") {
       var queue = hook.queue = {
         last: null,
         dispatch: null,
-        eagerReducer: reducer,
-        eagerState: initialState
+        lastRenderedReducer: reducer,
+        lastRenderedState: initialState
       };
       var dispatch = queue.dispatch = dispatchAction.bind(null, // Flow doesn't know this is non-null, but we do.
       currentlyRenderingFiber$1, queue);
@@ -16927,6 +17010,7 @@ if ("development" !== "production") {
       var hook = updateWorkInProgressHook();
       var queue = hook.queue;
       !(queue !== null) ? invariant(false, 'Should have a queue. This is likely a bug in React. Please file an issue.') : void 0;
+      queue.lastRenderedReducer = reducer;
 
       if (numberOfReRenders > 0) {
         // This is a re-render. Apply the new render phase updates to the previous
@@ -16965,6 +17049,7 @@ if ("development" !== "production") {
               hook.baseState = newState;
             }
 
+            queue.lastRenderedState = newState;
             return [newState, _dispatch];
           }
         }
@@ -17048,8 +17133,7 @@ if ("development" !== "production") {
         hook.memoizedState = _newState;
         hook.baseUpdate = newBaseUpdate;
         hook.baseState = newBaseState;
-        queue.eagerReducer = reducer;
-        queue.eagerState = _newState;
+        queue.lastRenderedState = _newState;
       }
 
       var dispatch = queue.dispatch;
@@ -17067,8 +17151,8 @@ if ("development" !== "production") {
       var queue = hook.queue = {
         last: null,
         dispatch: null,
-        eagerReducer: basicStateReducer,
-        eagerState: initialState
+        lastRenderedReducer: basicStateReducer,
+        lastRenderedState: initialState
       };
       var dispatch = queue.dispatch = dispatchAction.bind(null, // Flow doesn't know this is non-null, but we do.
       currentlyRenderingFiber$1, queue);
@@ -17362,9 +17446,9 @@ if ("development" !== "production") {
           // The queue is currently empty, which means we can eagerly compute the
           // next state before entering the render phase. If the new state is the
           // same as the current state, we may be able to bail out entirely.
-          var _eagerReducer = queue.eagerReducer;
+          var _lastRenderedReducer = queue.lastRenderedReducer;
 
-          if (_eagerReducer !== null) {
+          if (_lastRenderedReducer !== null) {
             var prevDispatcher = void 0;
             {
               prevDispatcher = ReactCurrentDispatcher$1.current;
@@ -17372,15 +17456,15 @@ if ("development" !== "production") {
             }
 
             try {
-              var currentState = queue.eagerState;
+              var currentState = queue.lastRenderedState;
 
-              var _eagerState = _eagerReducer(currentState, action); // Stash the eagerly computed state, and the reducer used to compute
+              var _eagerState = _lastRenderedReducer(currentState, action); // Stash the eagerly computed state, and the reducer used to compute
               // it, on the update object. If the reducer hasn't changed by the
               // time we enter the render phase, then the eager state can be used
               // without calling the reducer again.
 
 
-              _update2.eagerReducer = _eagerReducer;
+              _update2.eagerReducer = _lastRenderedReducer;
               _update2.eagerState = _eagerState;
 
               if (is(_eagerState, currentState)) {
@@ -17422,6 +17506,7 @@ if ("development" !== "production") {
       useDebugValue: throwInvalidHookError
     };
     var HooksDispatcherOnMountInDEV = null;
+    var HooksDispatcherOnMountWithHookTypesInDEV = null;
     var HooksDispatcherOnUpdateInDEV = null;
     var InvalidNestedHooksDispatcherOnMountInDEV = null;
     var InvalidNestedHooksDispatcherOnUpdateInDEV = null;
@@ -17440,26 +17525,32 @@ if ("development" !== "production") {
         },
         useCallback: function (callback, deps) {
           currentHookNameInDev = 'useCallback';
+          mountHookTypesDev();
           return mountCallback(callback, deps);
         },
         useContext: function (context, observedBits) {
           currentHookNameInDev = 'useContext';
-          return mountContext(context, observedBits);
+          mountHookTypesDev();
+          return readContext(context, observedBits);
         },
         useEffect: function (create, deps) {
           currentHookNameInDev = 'useEffect';
+          mountHookTypesDev();
           return mountEffect(create, deps);
         },
         useImperativeHandle: function (ref, create, deps) {
           currentHookNameInDev = 'useImperativeHandle';
+          mountHookTypesDev();
           return mountImperativeHandle(ref, create, deps);
         },
         useLayoutEffect: function (create, deps) {
           currentHookNameInDev = 'useLayoutEffect';
+          mountHookTypesDev();
           return mountLayoutEffect(create, deps);
         },
         useMemo: function (create, deps) {
           currentHookNameInDev = 'useMemo';
+          mountHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
 
@@ -17471,6 +17562,7 @@ if ("development" !== "production") {
         },
         useReducer: function (reducer, initialArg, init) {
           currentHookNameInDev = 'useReducer';
+          mountHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
 
@@ -17482,10 +17574,12 @@ if ("development" !== "production") {
         },
         useRef: function (initialValue) {
           currentHookNameInDev = 'useRef';
+          mountHookTypesDev();
           return mountRef(initialValue);
         },
         useState: function (initialState) {
           currentHookNameInDev = 'useState';
+          mountHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
 
@@ -17497,6 +17591,83 @@ if ("development" !== "production") {
         },
         useDebugValue: function (value, formatterFn) {
           currentHookNameInDev = 'useDebugValue';
+          mountHookTypesDev();
+          return mountDebugValue(value, formatterFn);
+        }
+      };
+      HooksDispatcherOnMountWithHookTypesInDEV = {
+        readContext: function (context, observedBits) {
+          return readContext(context, observedBits);
+        },
+        useCallback: function (callback, deps) {
+          currentHookNameInDev = 'useCallback';
+          updateHookTypesDev();
+          return mountCallback(callback, deps);
+        },
+        useContext: function (context, observedBits) {
+          currentHookNameInDev = 'useContext';
+          updateHookTypesDev();
+          return readContext(context, observedBits);
+        },
+        useEffect: function (create, deps) {
+          currentHookNameInDev = 'useEffect';
+          updateHookTypesDev();
+          return mountEffect(create, deps);
+        },
+        useImperativeHandle: function (ref, create, deps) {
+          currentHookNameInDev = 'useImperativeHandle';
+          updateHookTypesDev();
+          return mountImperativeHandle(ref, create, deps);
+        },
+        useLayoutEffect: function (create, deps) {
+          currentHookNameInDev = 'useLayoutEffect';
+          updateHookTypesDev();
+          return mountLayoutEffect(create, deps);
+        },
+        useMemo: function (create, deps) {
+          currentHookNameInDev = 'useMemo';
+          updateHookTypesDev();
+          var prevDispatcher = ReactCurrentDispatcher$1.current;
+          ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
+
+          try {
+            return mountMemo(create, deps);
+          } finally {
+            ReactCurrentDispatcher$1.current = prevDispatcher;
+          }
+        },
+        useReducer: function (reducer, initialArg, init) {
+          currentHookNameInDev = 'useReducer';
+          updateHookTypesDev();
+          var prevDispatcher = ReactCurrentDispatcher$1.current;
+          ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
+
+          try {
+            return mountReducer(reducer, initialArg, init);
+          } finally {
+            ReactCurrentDispatcher$1.current = prevDispatcher;
+          }
+        },
+        useRef: function (initialValue) {
+          currentHookNameInDev = 'useRef';
+          updateHookTypesDev();
+          return mountRef(initialValue);
+        },
+        useState: function (initialState) {
+          currentHookNameInDev = 'useState';
+          updateHookTypesDev();
+          var prevDispatcher = ReactCurrentDispatcher$1.current;
+          ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
+
+          try {
+            return mountState(initialState);
+          } finally {
+            ReactCurrentDispatcher$1.current = prevDispatcher;
+          }
+        },
+        useDebugValue: function (value, formatterFn) {
+          currentHookNameInDev = 'useDebugValue';
+          updateHookTypesDev();
           return mountDebugValue(value, formatterFn);
         }
       };
@@ -17506,26 +17677,32 @@ if ("development" !== "production") {
         },
         useCallback: function (callback, deps) {
           currentHookNameInDev = 'useCallback';
+          updateHookTypesDev();
           return updateCallback(callback, deps);
         },
         useContext: function (context, observedBits) {
           currentHookNameInDev = 'useContext';
-          return updateContext(context, observedBits);
+          updateHookTypesDev();
+          return readContext(context, observedBits);
         },
         useEffect: function (create, deps) {
           currentHookNameInDev = 'useEffect';
+          updateHookTypesDev();
           return updateEffect(create, deps);
         },
         useImperativeHandle: function (ref, create, deps) {
           currentHookNameInDev = 'useImperativeHandle';
+          updateHookTypesDev();
           return updateImperativeHandle(ref, create, deps);
         },
         useLayoutEffect: function (create, deps) {
           currentHookNameInDev = 'useLayoutEffect';
+          updateHookTypesDev();
           return updateLayoutEffect(create, deps);
         },
         useMemo: function (create, deps) {
           currentHookNameInDev = 'useMemo';
+          updateHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
 
@@ -17537,6 +17714,7 @@ if ("development" !== "production") {
         },
         useReducer: function (reducer, initialArg, init) {
           currentHookNameInDev = 'useReducer';
+          updateHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
 
@@ -17548,10 +17726,12 @@ if ("development" !== "production") {
         },
         useRef: function (initialValue) {
           currentHookNameInDev = 'useRef';
+          updateHookTypesDev();
           return updateRef(initialValue);
         },
         useState: function (initialState) {
           currentHookNameInDev = 'useState';
+          updateHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
 
@@ -17563,6 +17743,7 @@ if ("development" !== "production") {
         },
         useDebugValue: function (value, formatterFn) {
           currentHookNameInDev = 'useDebugValue';
+          updateHookTypesDev();
           return updateDebugValue(value, formatterFn);
         }
       };
@@ -17574,31 +17755,37 @@ if ("development" !== "production") {
         useCallback: function (callback, deps) {
           currentHookNameInDev = 'useCallback';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           return mountCallback(callback, deps);
         },
         useContext: function (context, observedBits) {
           currentHookNameInDev = 'useContext';
           warnInvalidHookAccess();
-          return mountContext(context, observedBits);
+          mountHookTypesDev();
+          return readContext(context, observedBits);
         },
         useEffect: function (create, deps) {
           currentHookNameInDev = 'useEffect';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           return mountEffect(create, deps);
         },
         useImperativeHandle: function (ref, create, deps) {
           currentHookNameInDev = 'useImperativeHandle';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           return mountImperativeHandle(ref, create, deps);
         },
         useLayoutEffect: function (create, deps) {
           currentHookNameInDev = 'useLayoutEffect';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           return mountLayoutEffect(create, deps);
         },
         useMemo: function (create, deps) {
           currentHookNameInDev = 'useMemo';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
 
@@ -17611,6 +17798,7 @@ if ("development" !== "production") {
         useReducer: function (reducer, initialArg, init) {
           currentHookNameInDev = 'useReducer';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
 
@@ -17623,11 +17811,13 @@ if ("development" !== "production") {
         useRef: function (initialValue) {
           currentHookNameInDev = 'useRef';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           return mountRef(initialValue);
         },
         useState: function (initialState) {
           currentHookNameInDev = 'useState';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnMountInDEV;
 
@@ -17640,6 +17830,7 @@ if ("development" !== "production") {
         useDebugValue: function (value, formatterFn) {
           currentHookNameInDev = 'useDebugValue';
           warnInvalidHookAccess();
+          mountHookTypesDev();
           return mountDebugValue(value, formatterFn);
         }
       };
@@ -17651,31 +17842,37 @@ if ("development" !== "production") {
         useCallback: function (callback, deps) {
           currentHookNameInDev = 'useCallback';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           return updateCallback(callback, deps);
         },
         useContext: function (context, observedBits) {
           currentHookNameInDev = 'useContext';
           warnInvalidHookAccess();
-          return updateContext(context, observedBits);
+          updateHookTypesDev();
+          return readContext(context, observedBits);
         },
         useEffect: function (create, deps) {
           currentHookNameInDev = 'useEffect';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           return updateEffect(create, deps);
         },
         useImperativeHandle: function (ref, create, deps) {
           currentHookNameInDev = 'useImperativeHandle';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           return updateImperativeHandle(ref, create, deps);
         },
         useLayoutEffect: function (create, deps) {
           currentHookNameInDev = 'useLayoutEffect';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           return updateLayoutEffect(create, deps);
         },
         useMemo: function (create, deps) {
           currentHookNameInDev = 'useMemo';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
 
@@ -17688,6 +17885,7 @@ if ("development" !== "production") {
         useReducer: function (reducer, initialArg, init) {
           currentHookNameInDev = 'useReducer';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
 
@@ -17700,11 +17898,13 @@ if ("development" !== "production") {
         useRef: function (initialValue) {
           currentHookNameInDev = 'useRef';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           return updateRef(initialValue);
         },
         useState: function (initialState) {
           currentHookNameInDev = 'useState';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           var prevDispatcher = ReactCurrentDispatcher$1.current;
           ReactCurrentDispatcher$1.current = InvalidNestedHooksDispatcherOnUpdateInDEV;
 
@@ -17717,6 +17917,7 @@ if ("development" !== "production") {
         useDebugValue: function (value, formatterFn) {
           currentHookNameInDev = 'useDebugValue';
           warnInvalidHookAccess();
+          updateHookTypesDev();
           return updateDebugValue(value, formatterFn);
         }
       };
@@ -21232,12 +21433,12 @@ if ("development" !== "production") {
                 if (_destroy === null) {
                   addendum = ' You returned null. If your effect does not require clean ' + 'up, return undefined (or nothing).';
                 } else if (typeof _destroy.then === 'function') {
-                  addendum = '\n\nIt looks like you wrote useEffect(async () => ...) or returned a Promise. ' + 'Instead, you may write an async function separately ' + 'and then call it from inside the effect:\n\n' + 'async function fetchComment(commentId) {\n' + '  // You can await here\n' + '}\n\n' + 'useEffect(() => {\n' + '  fetchComment(commentId);\n' + '}, [commentId]);\n\n' + 'In the future, React will provide a more idiomatic solution for data fetching ' + "that doesn't involve writing effects manually.";
+                  addendum = '\n\nIt looks like you wrote useEffect(async () => ...) or returned a Promise. ' + 'Instead, write the async function inside your effect ' + 'and call it immediately:\n\n' + 'useEffect(() => {\n' + '  async function fetchData() {\n' + '    // You can await here\n' + '    const response = await MyAPI.getData(someId);\n' + '    // ...\n' + '  }\n' + '  fetchData();\n' + '}, [someId]); // Or [] if effect doesn\'t need props or state\n\n' + 'Learn more about data fetching with Hooks: https://fb.me/react-hooks-data-fetching';
                 } else {
                   addendum = ' You returned: ' + _destroy;
                 }
 
-                warningWithoutStack$1(false, 'An Effect function must not return anything besides a function, ' + 'which is used for clean-up.%s%s', addendum, getStackByFiberInDevAndProd(finishedWork));
+                warningWithoutStack$1(false, 'An effect function must not return anything besides a function, ' + 'which is used for clean-up.%s%s', addendum, getStackByFiberInDevAndProd(finishedWork));
               }
             }
           }
@@ -24969,7 +25170,7 @@ if ("development" !== "production") {
     } // TODO: this is special because it gets imported during build.
 
 
-    var ReactVersion = '16.8.2'; // TODO: This type is shared between the reconciler and ReactDOM, but will
+    var ReactVersion = '16.8.6'; // TODO: This type is shared between the reconciler and ReactDOM, but will
     // eventually be lifted out to the renderer.
 
     var ReactCurrentOwner = ReactSharedInternals.ReactCurrentOwner;
@@ -25547,7 +25748,7 @@ if ("development" === 'production') {
 } else {
   module.exports = require('./cjs/react-dom.development.js');
 }
-},{"./cjs/react-dom.development.js":"../node_modules/react-dom/cjs/react-dom.development.js"}],"../node_modules/axios/lib/helpers/bind.js":[function(require,module,exports) {
+},{"./cjs/react-dom.development.js":"../node_modules/react-dom/cjs/react-dom.development.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/bind.js":[function(require,module,exports) {
 'use strict';
 
 module.exports = function bind(fn, thisArg) {
@@ -25560,7 +25761,7 @@ module.exports = function bind(fn, thisArg) {
   };
 };
 
-},{}],"../node_modules/is-buffer/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/is-buffer/index.js":[function(require,module,exports) {
 /*!
  * Determine if an object is a Buffer
  *
@@ -25583,7 +25784,7 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],"../node_modules/axios/lib/utils.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js":[function(require,module,exports) {
 'use strict';
 
 var bind = require('./helpers/bind');
@@ -25888,7 +26089,7 @@ module.exports = {
   trim: trim
 };
 
-},{"./helpers/bind":"../node_modules/axios/lib/helpers/bind.js","is-buffer":"../node_modules/is-buffer/index.js"}],"../node_modules/axios/lib/helpers/normalizeHeaderName.js":[function(require,module,exports) {
+},{"./helpers/bind":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/bind.js","is-buffer":"../node_modules/darklaunch-js/node_modules/is-buffer/index.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/normalizeHeaderName.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('../utils');
@@ -25902,7 +26103,7 @@ module.exports = function normalizeHeaderName(headers, normalizedName) {
   });
 };
 
-},{"../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/core/enhanceError.js":[function(require,module,exports) {
+},{"../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/core/enhanceError.js":[function(require,module,exports) {
 'use strict';
 
 /**
@@ -25925,7 +26126,7 @@ module.exports = function enhanceError(error, config, code, request, response) {
   return error;
 };
 
-},{}],"../node_modules/axios/lib/core/createError.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/core/createError.js":[function(require,module,exports) {
 'use strict';
 
 var enhanceError = require('./enhanceError');
@@ -25945,7 +26146,7 @@ module.exports = function createError(message, config, code, request, response) 
   return enhanceError(error, config, code, request, response);
 };
 
-},{"./enhanceError":"../node_modules/axios/lib/core/enhanceError.js"}],"../node_modules/axios/lib/core/settle.js":[function(require,module,exports) {
+},{"./enhanceError":"../node_modules/darklaunch-js/node_modules/axios/lib/core/enhanceError.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/core/settle.js":[function(require,module,exports) {
 'use strict';
 
 var createError = require('./createError');
@@ -25973,7 +26174,7 @@ module.exports = function settle(resolve, reject, response) {
   }
 };
 
-},{"./createError":"../node_modules/axios/lib/core/createError.js"}],"../node_modules/axios/lib/helpers/buildURL.js":[function(require,module,exports) {
+},{"./createError":"../node_modules/darklaunch-js/node_modules/axios/lib/core/createError.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/buildURL.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./../utils');
@@ -26041,7 +26242,7 @@ module.exports = function buildURL(url, params, paramsSerializer) {
   return url;
 };
 
-},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/helpers/parseHeaders.js":[function(require,module,exports) {
+},{"./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/parseHeaders.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./../utils');
@@ -26096,7 +26297,7 @@ module.exports = function parseHeaders(headers) {
   return parsed;
 };
 
-},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/helpers/isURLSameOrigin.js":[function(require,module,exports) {
+},{"./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/isURLSameOrigin.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./../utils');
@@ -26166,7 +26367,7 @@ module.exports = (
   })()
 );
 
-},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/helpers/btoa.js":[function(require,module,exports) {
+},{"./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/btoa.js":[function(require,module,exports) {
 'use strict';
 
 // btoa polyfill for IE<10 courtesy https://github.com/davidchambers/Base64.js
@@ -26204,7 +26405,7 @@ function btoa(input) {
 
 module.exports = btoa;
 
-},{}],"../node_modules/axios/lib/helpers/cookies.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/cookies.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./../utils');
@@ -26259,7 +26460,7 @@ module.exports = (
   })()
 );
 
-},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/adapters/xhr.js":[function(require,module,exports) {
+},{"./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/adapters/xhr.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./../utils');
@@ -26435,7 +26636,7 @@ module.exports = function xhrAdapter(config) {
     request.send(requestData);
   });
 };
-},{"./../utils":"../node_modules/axios/lib/utils.js","./../core/settle":"../node_modules/axios/lib/core/settle.js","./../helpers/buildURL":"../node_modules/axios/lib/helpers/buildURL.js","./../helpers/parseHeaders":"../node_modules/axios/lib/helpers/parseHeaders.js","./../helpers/isURLSameOrigin":"../node_modules/axios/lib/helpers/isURLSameOrigin.js","../core/createError":"../node_modules/axios/lib/core/createError.js","./../helpers/btoa":"../node_modules/axios/lib/helpers/btoa.js","./../helpers/cookies":"../node_modules/axios/lib/helpers/cookies.js"}],"../node_modules/process/browser.js":[function(require,module,exports) {
+},{"./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js","./../core/settle":"../node_modules/darklaunch-js/node_modules/axios/lib/core/settle.js","./../helpers/buildURL":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/buildURL.js","./../helpers/parseHeaders":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/parseHeaders.js","./../helpers/isURLSameOrigin":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/isURLSameOrigin.js","../core/createError":"../node_modules/darklaunch-js/node_modules/axios/lib/core/createError.js","./../helpers/btoa":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/btoa.js","./../helpers/cookies":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/cookies.js"}],"../node_modules/process/browser.js":[function(require,module,exports) {
 
 // shim for using process in browser
 var process = module.exports = {}; // cached from whatever global is present so that test runners that stub it
@@ -26644,7 +26845,7 @@ process.chdir = function (dir) {
 process.umask = function () {
   return 0;
 };
-},{}],"../node_modules/axios/lib/defaults.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/defaults.js":[function(require,module,exports) {
 var process = require("process");
 'use strict';
 
@@ -26743,7 +26944,7 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 
 module.exports = defaults;
 
-},{"./utils":"../node_modules/axios/lib/utils.js","./helpers/normalizeHeaderName":"../node_modules/axios/lib/helpers/normalizeHeaderName.js","./adapters/xhr":"../node_modules/axios/lib/adapters/xhr.js","./adapters/http":"../node_modules/axios/lib/adapters/xhr.js","process":"../node_modules/process/browser.js"}],"../node_modules/axios/lib/core/InterceptorManager.js":[function(require,module,exports) {
+},{"./utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js","./helpers/normalizeHeaderName":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/normalizeHeaderName.js","./adapters/xhr":"../node_modules/darklaunch-js/node_modules/axios/lib/adapters/xhr.js","./adapters/http":"../node_modules/darklaunch-js/node_modules/axios/lib/adapters/xhr.js","process":"../node_modules/process/browser.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/core/InterceptorManager.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./../utils');
@@ -26797,7 +26998,7 @@ InterceptorManager.prototype.forEach = function forEach(fn) {
 
 module.exports = InterceptorManager;
 
-},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/core/transformData.js":[function(require,module,exports) {
+},{"./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/core/transformData.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./../utils');
@@ -26819,14 +27020,14 @@ module.exports = function transformData(data, headers, fns) {
   return data;
 };
 
-},{"./../utils":"../node_modules/axios/lib/utils.js"}],"../node_modules/axios/lib/cancel/isCancel.js":[function(require,module,exports) {
+},{"./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/cancel/isCancel.js":[function(require,module,exports) {
 'use strict';
 
 module.exports = function isCancel(value) {
   return !!(value && value.__CANCEL__);
 };
 
-},{}],"../node_modules/axios/lib/helpers/isAbsoluteURL.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/isAbsoluteURL.js":[function(require,module,exports) {
 'use strict';
 
 /**
@@ -26842,7 +27043,7 @@ module.exports = function isAbsoluteURL(url) {
   return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
 };
 
-},{}],"../node_modules/axios/lib/helpers/combineURLs.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/combineURLs.js":[function(require,module,exports) {
 'use strict';
 
 /**
@@ -26858,7 +27059,7 @@ module.exports = function combineURLs(baseURL, relativeURL) {
     : baseURL;
 };
 
-},{}],"../node_modules/axios/lib/core/dispatchRequest.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/core/dispatchRequest.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./../utils');
@@ -26946,7 +27147,7 @@ module.exports = function dispatchRequest(config) {
   });
 };
 
-},{"./../utils":"../node_modules/axios/lib/utils.js","./transformData":"../node_modules/axios/lib/core/transformData.js","../cancel/isCancel":"../node_modules/axios/lib/cancel/isCancel.js","../defaults":"../node_modules/axios/lib/defaults.js","./../helpers/isAbsoluteURL":"../node_modules/axios/lib/helpers/isAbsoluteURL.js","./../helpers/combineURLs":"../node_modules/axios/lib/helpers/combineURLs.js"}],"../node_modules/axios/lib/core/Axios.js":[function(require,module,exports) {
+},{"./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js","./transformData":"../node_modules/darklaunch-js/node_modules/axios/lib/core/transformData.js","../cancel/isCancel":"../node_modules/darklaunch-js/node_modules/axios/lib/cancel/isCancel.js","../defaults":"../node_modules/darklaunch-js/node_modules/axios/lib/defaults.js","./../helpers/isAbsoluteURL":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/isAbsoluteURL.js","./../helpers/combineURLs":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/combineURLs.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/core/Axios.js":[function(require,module,exports) {
 'use strict';
 
 var defaults = require('./../defaults');
@@ -27027,7 +27228,7 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 
 module.exports = Axios;
 
-},{"./../defaults":"../node_modules/axios/lib/defaults.js","./../utils":"../node_modules/axios/lib/utils.js","./InterceptorManager":"../node_modules/axios/lib/core/InterceptorManager.js","./dispatchRequest":"../node_modules/axios/lib/core/dispatchRequest.js"}],"../node_modules/axios/lib/cancel/Cancel.js":[function(require,module,exports) {
+},{"./../defaults":"../node_modules/darklaunch-js/node_modules/axios/lib/defaults.js","./../utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js","./InterceptorManager":"../node_modules/darklaunch-js/node_modules/axios/lib/core/InterceptorManager.js","./dispatchRequest":"../node_modules/darklaunch-js/node_modules/axios/lib/core/dispatchRequest.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/cancel/Cancel.js":[function(require,module,exports) {
 'use strict';
 
 /**
@@ -27048,7 +27249,7 @@ Cancel.prototype.__CANCEL__ = true;
 
 module.exports = Cancel;
 
-},{}],"../node_modules/axios/lib/cancel/CancelToken.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/cancel/CancelToken.js":[function(require,module,exports) {
 'use strict';
 
 var Cancel = require('./Cancel');
@@ -27107,7 +27308,7 @@ CancelToken.source = function source() {
 
 module.exports = CancelToken;
 
-},{"./Cancel":"../node_modules/axios/lib/cancel/Cancel.js"}],"../node_modules/axios/lib/helpers/spread.js":[function(require,module,exports) {
+},{"./Cancel":"../node_modules/darklaunch-js/node_modules/axios/lib/cancel/Cancel.js"}],"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/spread.js":[function(require,module,exports) {
 'use strict';
 
 /**
@@ -27136,7 +27337,7 @@ module.exports = function spread(callback) {
   };
 };
 
-},{}],"../node_modules/axios/lib/axios.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/axios/lib/axios.js":[function(require,module,exports) {
 'use strict';
 
 var utils = require('./utils');
@@ -27190,9 +27391,9 @@ module.exports = axios;
 // Allow use of default import syntax in TypeScript
 module.exports.default = axios;
 
-},{"./utils":"../node_modules/axios/lib/utils.js","./helpers/bind":"../node_modules/axios/lib/helpers/bind.js","./core/Axios":"../node_modules/axios/lib/core/Axios.js","./defaults":"../node_modules/axios/lib/defaults.js","./cancel/Cancel":"../node_modules/axios/lib/cancel/Cancel.js","./cancel/CancelToken":"../node_modules/axios/lib/cancel/CancelToken.js","./cancel/isCancel":"../node_modules/axios/lib/cancel/isCancel.js","./helpers/spread":"../node_modules/axios/lib/helpers/spread.js"}],"../node_modules/axios/index.js":[function(require,module,exports) {
+},{"./utils":"../node_modules/darklaunch-js/node_modules/axios/lib/utils.js","./helpers/bind":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/bind.js","./core/Axios":"../node_modules/darklaunch-js/node_modules/axios/lib/core/Axios.js","./defaults":"../node_modules/darklaunch-js/node_modules/axios/lib/defaults.js","./cancel/Cancel":"../node_modules/darklaunch-js/node_modules/axios/lib/cancel/Cancel.js","./cancel/CancelToken":"../node_modules/darklaunch-js/node_modules/axios/lib/cancel/CancelToken.js","./cancel/isCancel":"../node_modules/darklaunch-js/node_modules/axios/lib/cancel/isCancel.js","./helpers/spread":"../node_modules/darklaunch-js/node_modules/axios/lib/helpers/spread.js"}],"../node_modules/darklaunch-js/node_modules/axios/index.js":[function(require,module,exports) {
 module.exports = require('./lib/axios');
-},{"./lib/axios":"../node_modules/axios/lib/axios.js"}],"../node_modules/store/src/util.js":[function(require,module,exports) {
+},{"./lib/axios":"../node_modules/darklaunch-js/node_modules/axios/lib/axios.js"}],"../node_modules/darklaunch-js/node_modules/store/src/util.js":[function(require,module,exports) {
 var global = arguments[3];
 var assign = make_assign()
 var create = make_create()
@@ -27313,7 +27514,7 @@ function isObject(val) {
 	return val && {}.toString.call(val) === '[object Object]'
 }
 
-},{}],"../node_modules/store/src/store-engine.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/store/src/store-engine.js":[function(require,module,exports) {
 var util = require('./util')
 var slice = util.slice
 var pluck = util.pluck
@@ -27552,7 +27753,7 @@ function createStore(storages, plugins, namespace) {
 	return store
 }
 
-},{"./util":"../node_modules/store/src/util.js"}],"../node_modules/store/storages/localStorage.js":[function(require,module,exports) {
+},{"./util":"../node_modules/darklaunch-js/node_modules/store/src/util.js"}],"../node_modules/darklaunch-js/node_modules/store/storages/localStorage.js":[function(require,module,exports) {
 var util = require('../src/util')
 var Global = util.Global
 
@@ -27592,7 +27793,7 @@ function clearAll() {
 	return localStorage().clear()
 }
 
-},{"../src/util":"../node_modules/store/src/util.js"}],"../node_modules/store/storages/oldFF-globalStorage.js":[function(require,module,exports) {
+},{"../src/util":"../node_modules/darklaunch-js/node_modules/store/src/util.js"}],"../node_modules/darklaunch-js/node_modules/store/storages/oldFF-globalStorage.js":[function(require,module,exports) {
 // oldFF-globalStorage provides storage for Firefox
 // versions 6 and 7, where no localStorage, etc
 // is available.
@@ -27636,7 +27837,7 @@ function clearAll() {
 	})
 }
 
-},{"../src/util":"../node_modules/store/src/util.js"}],"../node_modules/store/storages/oldIE-userDataStorage.js":[function(require,module,exports) {
+},{"../src/util":"../node_modules/darklaunch-js/node_modules/store/src/util.js"}],"../node_modules/darklaunch-js/node_modules/store/storages/oldIE-userDataStorage.js":[function(require,module,exports) {
 // oldIE-userDataStorage provides storage for Internet Explorer
 // versions 6 and 7, where no localStorage, sessionStorage, etc
 // is available.
@@ -27765,7 +27966,7 @@ function _makeIEStorageElFunction() {
 	}
 }
 
-},{"../src/util":"../node_modules/store/src/util.js"}],"../node_modules/store/storages/cookieStorage.js":[function(require,module,exports) {
+},{"../src/util":"../node_modules/darklaunch-js/node_modules/store/src/util.js"}],"../node_modules/darklaunch-js/node_modules/store/storages/cookieStorage.js":[function(require,module,exports) {
 // cookieStorage is useful Safari private browser mode, where localStorage
 // doesn't work but cookies do. This implementation is adopted from
 // https://developer.mozilla.org/en-US/docs/Web/API/Storage/LocalStorage
@@ -27828,7 +28029,7 @@ function _has(key) {
 	return (new RegExp("(?:^|;\\s*)" + escape(key).replace(/[\-\.\+\*]/g, "\\$&") + "\\s*\\=")).test(doc.cookie)
 }
 
-},{"../src/util":"../node_modules/store/src/util.js"}],"../node_modules/store/storages/sessionStorage.js":[function(require,module,exports) {
+},{"../src/util":"../node_modules/darklaunch-js/node_modules/store/src/util.js"}],"../node_modules/darklaunch-js/node_modules/store/storages/sessionStorage.js":[function(require,module,exports) {
 var util = require('../src/util')
 var Global = util.Global
 
@@ -27868,7 +28069,7 @@ function clearAll() {
 	return sessionStorage().clear()
 }
 
-},{"../src/util":"../node_modules/store/src/util.js"}],"../node_modules/store/storages/memoryStorage.js":[function(require,module,exports) {
+},{"../src/util":"../node_modules/darklaunch-js/node_modules/store/src/util.js"}],"../node_modules/darklaunch-js/node_modules/store/storages/memoryStorage.js":[function(require,module,exports) {
 // memoryStorage is a useful last fallback to ensure that the store
 // is functions (meaning store.get(), store.set(), etc will all function).
 // However, stored values will not persist when the browser navigates to
@@ -27909,7 +28110,7 @@ function clearAll(key) {
 	memoryStorage = {}
 }
 
-},{}],"../node_modules/store/storages/all.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/store/storages/all.js":[function(require,module,exports) {
 module.exports = [
 	// Listed in order of usage preference
 	require('./localStorage'),
@@ -27920,7 +28121,7 @@ module.exports = [
 	require('./memoryStorage')
 ]
 
-},{"./localStorage":"../node_modules/store/storages/localStorage.js","./oldFF-globalStorage":"../node_modules/store/storages/oldFF-globalStorage.js","./oldIE-userDataStorage":"../node_modules/store/storages/oldIE-userDataStorage.js","./cookieStorage":"../node_modules/store/storages/cookieStorage.js","./sessionStorage":"../node_modules/store/storages/sessionStorage.js","./memoryStorage":"../node_modules/store/storages/memoryStorage.js"}],"../node_modules/store/plugins/lib/json2.js":[function(require,module,exports) {
+},{"./localStorage":"../node_modules/darklaunch-js/node_modules/store/storages/localStorage.js","./oldFF-globalStorage":"../node_modules/darklaunch-js/node_modules/store/storages/oldFF-globalStorage.js","./oldIE-userDataStorage":"../node_modules/darklaunch-js/node_modules/store/storages/oldIE-userDataStorage.js","./cookieStorage":"../node_modules/darklaunch-js/node_modules/store/storages/cookieStorage.js","./sessionStorage":"../node_modules/darklaunch-js/node_modules/store/storages/sessionStorage.js","./memoryStorage":"../node_modules/darklaunch-js/node_modules/store/storages/memoryStorage.js"}],"../node_modules/darklaunch-js/node_modules/store/plugins/lib/json2.js":[function(require,module,exports) {
 /* eslint-disable */
 
 //  json2.js
@@ -28429,7 +28630,7 @@ if (typeof JSON !== "object") {
         };
     }
 }());
-},{}],"../node_modules/store/plugins/json2.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/store/plugins/json2.js":[function(require,module,exports) {
 module.exports = json2Plugin
 
 function json2Plugin() {
@@ -28437,7 +28638,7 @@ function json2Plugin() {
 	return {}
 }
 
-},{"./lib/json2":"../node_modules/store/plugins/lib/json2.js"}],"../node_modules/store/dist/store.legacy.js":[function(require,module,exports) {
+},{"./lib/json2":"../node_modules/darklaunch-js/node_modules/store/plugins/lib/json2.js"}],"../node_modules/darklaunch-js/node_modules/store/dist/store.legacy.js":[function(require,module,exports) {
 var engine = require('../src/store-engine')
 
 var storages = require('../storages/all')
@@ -28445,15 +28646,16 @@ var plugins = [require('../plugins/json2')]
 
 module.exports = engine.createStore(storages, plugins)
 
-},{"../src/store-engine":"../node_modules/store/src/store-engine.js","../storages/all":"../node_modules/store/storages/all.js","../plugins/json2":"../node_modules/store/plugins/json2.js"}],"../darklaunch.config.json":[function(require,module,exports) {
+},{"../src/store-engine":"../node_modules/darklaunch-js/node_modules/store/src/store-engine.js","../storages/all":"../node_modules/darklaunch-js/node_modules/store/storages/all.js","../plugins/json2":"../node_modules/darklaunch-js/node_modules/store/plugins/json2.js"}],"../darklaunch.config.json":[function(require,module,exports) {
 module.exports = {
   "version": "0.1.0",
   "settings": {
+    "url": "http://localhost:3000/",
     "enableStreaming": true,
     "project": "GP0xZjr0A22h5SyD2HsY5S5kEHoFoTN6"
   }
 };
-},{}],"../node_modules/parseuri/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/parseuri/index.js":[function(require,module,exports) {
 /**
  * Parses an URI
  *
@@ -28494,7 +28696,7 @@ module.exports = function parseuri(str) {
     return uri;
 };
 
-},{}],"../node_modules/socket.io-client/node_modules/ms/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/ms/index.js":[function(require,module,exports) {
 /**
  * Helpers.
  */
@@ -28648,7 +28850,7 @@ function plural(ms, n, name) {
   return Math.ceil(ms / n) + ' ' + name + 's';
 }
 
-},{}],"../node_modules/socket.io-client/node_modules/debug/src/debug.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/debug/src/debug.js":[function(require,module,exports) {
 
 /**
  * This is the common logic for both the Node.js and web browser
@@ -28875,7 +29077,7 @@ function coerce(val) {
   return val;
 }
 
-},{"ms":"../node_modules/socket.io-client/node_modules/ms/index.js"}],"../node_modules/socket.io-client/node_modules/debug/src/browser.js":[function(require,module,exports) {
+},{"ms":"../node_modules/darklaunch-js/node_modules/ms/index.js"}],"../node_modules/darklaunch-js/node_modules/debug/src/browser.js":[function(require,module,exports) {
 var process = require("process");
 /**
  * This is the web browser implementation of `debug()`.
@@ -29039,7 +29241,8 @@ function localstorage() {
     return window.localStorage;
   } catch (e) {}
 }
-},{"./debug":"../node_modules/socket.io-client/node_modules/debug/src/debug.js","process":"../node_modules/process/browser.js"}],"../node_modules/socket.io-client/lib/url.js":[function(require,module,exports) {
+},{"./debug":"../node_modules/darklaunch-js/node_modules/debug/src/debug.js","process":"../node_modules/process/browser.js"}],"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/url.js":[function(require,module,exports) {
+var global = arguments[3];
 
 /**
  * Module dependencies.
@@ -29067,7 +29270,7 @@ function url (uri, loc) {
   var obj = uri;
 
   // default to window.location
-  loc = loc || (typeof location !== 'undefined' && location);
+  loc = loc || global.location;
   if (null == uri) uri = loc.protocol + '//' + loc.host;
 
   // relative path support
@@ -29116,552 +29319,7 @@ function url (uri, loc) {
   return obj;
 }
 
-},{"parseuri":"../node_modules/parseuri/index.js","debug":"../node_modules/socket.io-client/node_modules/debug/src/browser.js"}],"../node_modules/socket.io-parser/node_modules/ms/index.js":[function(require,module,exports) {
-/**
- * Helpers.
- */
-
-var s = 1000;
-var m = s * 60;
-var h = m * 60;
-var d = h * 24;
-var y = d * 365.25;
-
-/**
- * Parse or format the given `val`.
- *
- * Options:
- *
- *  - `long` verbose formatting [false]
- *
- * @param {String|Number} val
- * @param {Object} [options]
- * @throws {Error} throw an error if val is not a non-empty string or a number
- * @return {String|Number}
- * @api public
- */
-
-module.exports = function(val, options) {
-  options = options || {};
-  var type = typeof val;
-  if (type === 'string' && val.length > 0) {
-    return parse(val);
-  } else if (type === 'number' && isNaN(val) === false) {
-    return options.long ? fmtLong(val) : fmtShort(val);
-  }
-  throw new Error(
-    'val is not a non-empty string or a valid number. val=' +
-      JSON.stringify(val)
-  );
-};
-
-/**
- * Parse the given `str` and return milliseconds.
- *
- * @param {String} str
- * @return {Number}
- * @api private
- */
-
-function parse(str) {
-  str = String(str);
-  if (str.length > 100) {
-    return;
-  }
-  var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(
-    str
-  );
-  if (!match) {
-    return;
-  }
-  var n = parseFloat(match[1]);
-  var type = (match[2] || 'ms').toLowerCase();
-  switch (type) {
-    case 'years':
-    case 'year':
-    case 'yrs':
-    case 'yr':
-    case 'y':
-      return n * y;
-    case 'days':
-    case 'day':
-    case 'd':
-      return n * d;
-    case 'hours':
-    case 'hour':
-    case 'hrs':
-    case 'hr':
-    case 'h':
-      return n * h;
-    case 'minutes':
-    case 'minute':
-    case 'mins':
-    case 'min':
-    case 'm':
-      return n * m;
-    case 'seconds':
-    case 'second':
-    case 'secs':
-    case 'sec':
-    case 's':
-      return n * s;
-    case 'milliseconds':
-    case 'millisecond':
-    case 'msecs':
-    case 'msec':
-    case 'ms':
-      return n;
-    default:
-      return undefined;
-  }
-}
-
-/**
- * Short format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtShort(ms) {
-  if (ms >= d) {
-    return Math.round(ms / d) + 'd';
-  }
-  if (ms >= h) {
-    return Math.round(ms / h) + 'h';
-  }
-  if (ms >= m) {
-    return Math.round(ms / m) + 'm';
-  }
-  if (ms >= s) {
-    return Math.round(ms / s) + 's';
-  }
-  return ms + 'ms';
-}
-
-/**
- * Long format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtLong(ms) {
-  return plural(ms, d, 'day') ||
-    plural(ms, h, 'hour') ||
-    plural(ms, m, 'minute') ||
-    plural(ms, s, 'second') ||
-    ms + ' ms';
-}
-
-/**
- * Pluralization helper.
- */
-
-function plural(ms, n, name) {
-  if (ms < n) {
-    return;
-  }
-  if (ms < n * 1.5) {
-    return Math.floor(ms / n) + ' ' + name;
-  }
-  return Math.ceil(ms / n) + ' ' + name + 's';
-}
-
-},{}],"../node_modules/socket.io-parser/node_modules/debug/src/debug.js":[function(require,module,exports) {
-
-/**
- * This is the common logic for both the Node.js and web browser
- * implementations of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-
-exports = module.exports = createDebug.debug = createDebug['default'] = createDebug;
-exports.coerce = coerce;
-exports.disable = disable;
-exports.enable = enable;
-exports.enabled = enabled;
-exports.humanize = require('ms');
-
-/**
- * Active `debug` instances.
- */
-exports.instances = [];
-
-/**
- * The currently active debug mode names, and names to skip.
- */
-
-exports.names = [];
-exports.skips = [];
-
-/**
- * Map of special "%n" handling functions, for the debug "format" argument.
- *
- * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
- */
-
-exports.formatters = {};
-
-/**
- * Select a color.
- * @param {String} namespace
- * @return {Number}
- * @api private
- */
-
-function selectColor(namespace) {
-  var hash = 0, i;
-
-  for (i in namespace) {
-    hash  = ((hash << 5) - hash) + namespace.charCodeAt(i);
-    hash |= 0; // Convert to 32bit integer
-  }
-
-  return exports.colors[Math.abs(hash) % exports.colors.length];
-}
-
-/**
- * Create a debugger with the given `namespace`.
- *
- * @param {String} namespace
- * @return {Function}
- * @api public
- */
-
-function createDebug(namespace) {
-
-  var prevTime;
-
-  function debug() {
-    // disabled?
-    if (!debug.enabled) return;
-
-    var self = debug;
-
-    // set `diff` timestamp
-    var curr = +new Date();
-    var ms = curr - (prevTime || curr);
-    self.diff = ms;
-    self.prev = prevTime;
-    self.curr = curr;
-    prevTime = curr;
-
-    // turn the `arguments` into a proper Array
-    var args = new Array(arguments.length);
-    for (var i = 0; i < args.length; i++) {
-      args[i] = arguments[i];
-    }
-
-    args[0] = exports.coerce(args[0]);
-
-    if ('string' !== typeof args[0]) {
-      // anything else let's inspect with %O
-      args.unshift('%O');
-    }
-
-    // apply any `formatters` transformations
-    var index = 0;
-    args[0] = args[0].replace(/%([a-zA-Z%])/g, function(match, format) {
-      // if we encounter an escaped % then don't increase the array index
-      if (match === '%%') return match;
-      index++;
-      var formatter = exports.formatters[format];
-      if ('function' === typeof formatter) {
-        var val = args[index];
-        match = formatter.call(self, val);
-
-        // now we need to remove `args[index]` since it's inlined in the `format`
-        args.splice(index, 1);
-        index--;
-      }
-      return match;
-    });
-
-    // apply env-specific formatting (colors, etc.)
-    exports.formatArgs.call(self, args);
-
-    var logFn = debug.log || exports.log || console.log.bind(console);
-    logFn.apply(self, args);
-  }
-
-  debug.namespace = namespace;
-  debug.enabled = exports.enabled(namespace);
-  debug.useColors = exports.useColors();
-  debug.color = selectColor(namespace);
-  debug.destroy = destroy;
-
-  // env-specific initialization logic for debug instances
-  if ('function' === typeof exports.init) {
-    exports.init(debug);
-  }
-
-  exports.instances.push(debug);
-
-  return debug;
-}
-
-function destroy () {
-  var index = exports.instances.indexOf(this);
-  if (index !== -1) {
-    exports.instances.splice(index, 1);
-    return true;
-  } else {
-    return false;
-  }
-}
-
-/**
- * Enables a debug mode by namespaces. This can include modes
- * separated by a colon and wildcards.
- *
- * @param {String} namespaces
- * @api public
- */
-
-function enable(namespaces) {
-  exports.save(namespaces);
-
-  exports.names = [];
-  exports.skips = [];
-
-  var i;
-  var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
-  var len = split.length;
-
-  for (i = 0; i < len; i++) {
-    if (!split[i]) continue; // ignore empty strings
-    namespaces = split[i].replace(/\*/g, '.*?');
-    if (namespaces[0] === '-') {
-      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
-    } else {
-      exports.names.push(new RegExp('^' + namespaces + '$'));
-    }
-  }
-
-  for (i = 0; i < exports.instances.length; i++) {
-    var instance = exports.instances[i];
-    instance.enabled = exports.enabled(instance.namespace);
-  }
-}
-
-/**
- * Disable debug output.
- *
- * @api public
- */
-
-function disable() {
-  exports.enable('');
-}
-
-/**
- * Returns true if the given mode name is enabled, false otherwise.
- *
- * @param {String} name
- * @return {Boolean}
- * @api public
- */
-
-function enabled(name) {
-  if (name[name.length - 1] === '*') {
-    return true;
-  }
-  var i, len;
-  for (i = 0, len = exports.skips.length; i < len; i++) {
-    if (exports.skips[i].test(name)) {
-      return false;
-    }
-  }
-  for (i = 0, len = exports.names.length; i < len; i++) {
-    if (exports.names[i].test(name)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Coerce `val`.
- *
- * @param {Mixed} val
- * @return {Mixed}
- * @api private
- */
-
-function coerce(val) {
-  if (val instanceof Error) return val.stack || val.message;
-  return val;
-}
-
-},{"ms":"../node_modules/socket.io-parser/node_modules/ms/index.js"}],"../node_modules/socket.io-parser/node_modules/debug/src/browser.js":[function(require,module,exports) {
-var process = require("process");
-/**
- * This is the web browser implementation of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-exports = module.exports = require('./debug');
-exports.log = log;
-exports.formatArgs = formatArgs;
-exports.save = save;
-exports.load = load;
-exports.useColors = useColors;
-exports.storage = 'undefined' != typeof chrome && 'undefined' != typeof chrome.storage ? chrome.storage.local : localstorage();
-/**
- * Colors.
- */
-
-exports.colors = ['#0000CC', '#0000FF', '#0033CC', '#0033FF', '#0066CC', '#0066FF', '#0099CC', '#0099FF', '#00CC00', '#00CC33', '#00CC66', '#00CC99', '#00CCCC', '#00CCFF', '#3300CC', '#3300FF', '#3333CC', '#3333FF', '#3366CC', '#3366FF', '#3399CC', '#3399FF', '#33CC00', '#33CC33', '#33CC66', '#33CC99', '#33CCCC', '#33CCFF', '#6600CC', '#6600FF', '#6633CC', '#6633FF', '#66CC00', '#66CC33', '#9900CC', '#9900FF', '#9933CC', '#9933FF', '#99CC00', '#99CC33', '#CC0000', '#CC0033', '#CC0066', '#CC0099', '#CC00CC', '#CC00FF', '#CC3300', '#CC3333', '#CC3366', '#CC3399', '#CC33CC', '#CC33FF', '#CC6600', '#CC6633', '#CC9900', '#CC9933', '#CCCC00', '#CCCC33', '#FF0000', '#FF0033', '#FF0066', '#FF0099', '#FF00CC', '#FF00FF', '#FF3300', '#FF3333', '#FF3366', '#FF3399', '#FF33CC', '#FF33FF', '#FF6600', '#FF6633', '#FF9900', '#FF9933', '#FFCC00', '#FFCC33'];
-/**
- * Currently only WebKit-based Web Inspectors, Firefox >= v31,
- * and the Firebug extension (any Firefox version) are known
- * to support "%c" CSS customizations.
- *
- * TODO: add a `localStorage` variable to explicitly enable/disable colors
- */
-
-function useColors() {
-  // NB: In an Electron preload script, document will be defined but not fully
-  // initialized. Since we know we're in Chrome, we'll just detect this case
-  // explicitly
-  if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
-    return true;
-  } // Internet Explorer and Edge do not support colors.
-
-
-  if (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
-    return false;
-  } // is webkit? http://stackoverflow.com/a/16459606/376773
-  // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
-
-
-  return typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // is firebug? http://stackoverflow.com/a/398120/376773
-  typeof window !== 'undefined' && window.console && (window.console.firebug || window.console.exception && window.console.table) || // is firefox >= v31?
-  // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-  typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 || // double check webkit in userAgent just in case we are in a worker
-  typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
-}
-/**
- * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
- */
-
-
-exports.formatters.j = function (v) {
-  try {
-    return JSON.stringify(v);
-  } catch (err) {
-    return '[UnexpectedJSONParseError]: ' + err.message;
-  }
-};
-/**
- * Colorize log arguments if enabled.
- *
- * @api public
- */
-
-
-function formatArgs(args) {
-  var useColors = this.useColors;
-  args[0] = (useColors ? '%c' : '') + this.namespace + (useColors ? ' %c' : ' ') + args[0] + (useColors ? '%c ' : ' ') + '+' + exports.humanize(this.diff);
-  if (!useColors) return;
-  var c = 'color: ' + this.color;
-  args.splice(1, 0, c, 'color: inherit'); // the final "%c" is somewhat tricky, because there could be other
-  // arguments passed either before or after the %c, so we need to
-  // figure out the correct index to insert the CSS into
-
-  var index = 0;
-  var lastC = 0;
-  args[0].replace(/%[a-zA-Z%]/g, function (match) {
-    if ('%%' === match) return;
-    index++;
-
-    if ('%c' === match) {
-      // we only are interested in the *last* %c
-      // (the user may have provided their own)
-      lastC = index;
-    }
-  });
-  args.splice(lastC, 0, c);
-}
-/**
- * Invokes `console.log()` when available.
- * No-op when `console.log` is not a "function".
- *
- * @api public
- */
-
-
-function log() {
-  // this hackery is required for IE8/9, where
-  // the `console.log` function doesn't have 'apply'
-  return 'object' === typeof console && console.log && Function.prototype.apply.call(console.log, console, arguments);
-}
-/**
- * Save `namespaces`.
- *
- * @param {String} namespaces
- * @api private
- */
-
-
-function save(namespaces) {
-  try {
-    if (null == namespaces) {
-      exports.storage.removeItem('debug');
-    } else {
-      exports.storage.debug = namespaces;
-    }
-  } catch (e) {}
-}
-/**
- * Load `namespaces`.
- *
- * @return {String} returns the previously persisted debug modes
- * @api private
- */
-
-
-function load() {
-  var r;
-
-  try {
-    r = exports.storage.debug;
-  } catch (e) {} // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
-
-
-  if (!r && typeof process !== 'undefined' && 'env' in process) {
-    r = undefined;
-  }
-
-  return r;
-}
-/**
- * Enable namespaces listed in `localStorage.debug` initially.
- */
-
-
-exports.enable(load());
-/**
- * Localstorage attempts to return the localstorage.
- *
- * This is necessary because safari throws
- * when a user disables cookies/localstorage
- * and you attempt to access it.
- *
- * @return {LocalStorage}
- * @api private
- */
-
-function localstorage() {
-  try {
-    return window.localStorage;
-  } catch (e) {}
-}
-},{"./debug":"../node_modules/socket.io-parser/node_modules/debug/src/debug.js","process":"../node_modules/process/browser.js"}],"../node_modules/component-emitter/index.js":[function(require,module,exports) {
+},{"parseuri":"../node_modules/darklaunch-js/node_modules/parseuri/index.js","debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js"}],"../node_modules/darklaunch-js/node_modules/component-emitter/index.js":[function(require,module,exports) {
 
 /**
  * Expose `Emitter`.
@@ -29826,11 +29484,681 @@ Emitter.prototype.hasListeners = function(event){
   return !! this.listeners(event).length;
 };
 
-},{}],"../node_modules/socket.io-parser/node_modules/isarray/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/isarray/index.js":[function(require,module,exports) {
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
+};
+
+},{}],"../node_modules/darklaunch-js/node_modules/socket.io-parser/is-buffer.js":[function(require,module,exports) {
+var global = arguments[3];
+
+module.exports = isBuf;
+
+var withNativeBuffer = typeof global.Buffer === 'function' && typeof global.Buffer.isBuffer === 'function';
+var withNativeArrayBuffer = typeof global.ArrayBuffer === 'function';
+
+var isView = (function () {
+  if (withNativeArrayBuffer && typeof global.ArrayBuffer.isView === 'function') {
+    return global.ArrayBuffer.isView;
+  } else {
+    return function (obj) { return obj.buffer instanceof global.ArrayBuffer; };
+  }
+})();
+
+/**
+ * Returns true if obj is a buffer or an arraybuffer.
+ *
+ * @api private
+ */
+
+function isBuf(obj) {
+  return (withNativeBuffer && global.Buffer.isBuffer(obj)) ||
+          (withNativeArrayBuffer && (obj instanceof global.ArrayBuffer || isView(obj)));
+}
+
+},{}],"../node_modules/darklaunch-js/node_modules/socket.io-parser/binary.js":[function(require,module,exports) {
+var global = arguments[3];
+/*global Blob,File*/
+
+/**
+ * Module requirements
+ */
+
+var isArray = require('isarray');
+var isBuf = require('./is-buffer');
+var toString = Object.prototype.toString;
+var withNativeBlob = typeof global.Blob === 'function' || toString.call(global.Blob) === '[object BlobConstructor]';
+var withNativeFile = typeof global.File === 'function' || toString.call(global.File) === '[object FileConstructor]';
+
+/**
+ * Replaces every Buffer | ArrayBuffer in packet with a numbered placeholder.
+ * Anything with blobs or files should be fed through removeBlobs before coming
+ * here.
+ *
+ * @param {Object} packet - socket.io event packet
+ * @return {Object} with deconstructed packet and list of buffers
+ * @api public
+ */
+
+exports.deconstructPacket = function(packet) {
+  var buffers = [];
+  var packetData = packet.data;
+  var pack = packet;
+  pack.data = _deconstructPacket(packetData, buffers);
+  pack.attachments = buffers.length; // number of binary 'attachments'
+  return {packet: pack, buffers: buffers};
+};
+
+function _deconstructPacket(data, buffers) {
+  if (!data) return data;
+
+  if (isBuf(data)) {
+    var placeholder = { _placeholder: true, num: buffers.length };
+    buffers.push(data);
+    return placeholder;
+  } else if (isArray(data)) {
+    var newData = new Array(data.length);
+    for (var i = 0; i < data.length; i++) {
+      newData[i] = _deconstructPacket(data[i], buffers);
+    }
+    return newData;
+  } else if (typeof data === 'object' && !(data instanceof Date)) {
+    var newData = {};
+    for (var key in data) {
+      newData[key] = _deconstructPacket(data[key], buffers);
+    }
+    return newData;
+  }
+  return data;
+}
+
+/**
+ * Reconstructs a binary packet from its placeholder packet and buffers
+ *
+ * @param {Object} packet - event packet with placeholders
+ * @param {Array} buffers - binary buffers to put in placeholder positions
+ * @return {Object} reconstructed packet
+ * @api public
+ */
+
+exports.reconstructPacket = function(packet, buffers) {
+  packet.data = _reconstructPacket(packet.data, buffers);
+  packet.attachments = undefined; // no longer useful
+  return packet;
+};
+
+function _reconstructPacket(data, buffers) {
+  if (!data) return data;
+
+  if (data && data._placeholder) {
+    return buffers[data.num]; // appropriate buffer (should be natural order anyway)
+  } else if (isArray(data)) {
+    for (var i = 0; i < data.length; i++) {
+      data[i] = _reconstructPacket(data[i], buffers);
+    }
+  } else if (typeof data === 'object') {
+    for (var key in data) {
+      data[key] = _reconstructPacket(data[key], buffers);
+    }
+  }
+
+  return data;
+}
+
+/**
+ * Asynchronously removes Blobs or Files from data via
+ * FileReader's readAsArrayBuffer method. Used before encoding
+ * data as msgpack. Calls callback with the blobless data.
+ *
+ * @param {Object} data
+ * @param {Function} callback
+ * @api private
+ */
+
+exports.removeBlobs = function(data, callback) {
+  function _removeBlobs(obj, curKey, containingObject) {
+    if (!obj) return obj;
+
+    // convert any blob
+    if ((withNativeBlob && obj instanceof Blob) ||
+        (withNativeFile && obj instanceof File)) {
+      pendingBlobs++;
+
+      // async filereader
+      var fileReader = new FileReader();
+      fileReader.onload = function() { // this.result == arraybuffer
+        if (containingObject) {
+          containingObject[curKey] = this.result;
+        }
+        else {
+          bloblessData = this.result;
+        }
+
+        // if nothing pending its callback time
+        if(! --pendingBlobs) {
+          callback(bloblessData);
+        }
+      };
+
+      fileReader.readAsArrayBuffer(obj); // blob -> arraybuffer
+    } else if (isArray(obj)) { // handle array
+      for (var i = 0; i < obj.length; i++) {
+        _removeBlobs(obj[i], i, obj);
+      }
+    } else if (typeof obj === 'object' && !isBuf(obj)) { // and object
+      for (var key in obj) {
+        _removeBlobs(obj[key], key, obj);
+      }
+    }
+  }
+
+  var pendingBlobs = 0;
+  var bloblessData = data;
+  _removeBlobs(bloblessData);
+  if (!pendingBlobs) {
+    callback(bloblessData);
+  }
+};
+
+},{"isarray":"../node_modules/darklaunch-js/node_modules/isarray/index.js","./is-buffer":"../node_modules/darklaunch-js/node_modules/socket.io-parser/is-buffer.js"}],"../node_modules/darklaunch-js/node_modules/socket.io-parser/index.js":[function(require,module,exports) {
+
+/**
+ * Module dependencies.
+ */
+
+var debug = require('debug')('socket.io-parser');
+var Emitter = require('component-emitter');
+var binary = require('./binary');
+var isArray = require('isarray');
+var isBuf = require('./is-buffer');
+
+/**
+ * Protocol version.
+ *
+ * @api public
+ */
+
+exports.protocol = 4;
+
+/**
+ * Packet types.
+ *
+ * @api public
+ */
+
+exports.types = [
+  'CONNECT',
+  'DISCONNECT',
+  'EVENT',
+  'ACK',
+  'ERROR',
+  'BINARY_EVENT',
+  'BINARY_ACK'
+];
+
+/**
+ * Packet type `connect`.
+ *
+ * @api public
+ */
+
+exports.CONNECT = 0;
+
+/**
+ * Packet type `disconnect`.
+ *
+ * @api public
+ */
+
+exports.DISCONNECT = 1;
+
+/**
+ * Packet type `event`.
+ *
+ * @api public
+ */
+
+exports.EVENT = 2;
+
+/**
+ * Packet type `ack`.
+ *
+ * @api public
+ */
+
+exports.ACK = 3;
+
+/**
+ * Packet type `error`.
+ *
+ * @api public
+ */
+
+exports.ERROR = 4;
+
+/**
+ * Packet type 'binary event'
+ *
+ * @api public
+ */
+
+exports.BINARY_EVENT = 5;
+
+/**
+ * Packet type `binary ack`. For acks with binary arguments.
+ *
+ * @api public
+ */
+
+exports.BINARY_ACK = 6;
+
+/**
+ * Encoder constructor.
+ *
+ * @api public
+ */
+
+exports.Encoder = Encoder;
+
+/**
+ * Decoder constructor.
+ *
+ * @api public
+ */
+
+exports.Decoder = Decoder;
+
+/**
+ * A socket.io Encoder instance
+ *
+ * @api public
+ */
+
+function Encoder() {}
+
+var ERROR_PACKET = exports.ERROR + '"encode error"';
+
+/**
+ * Encode a packet as a single string if non-binary, or as a
+ * buffer sequence, depending on packet type.
+ *
+ * @param {Object} obj - packet object
+ * @param {Function} callback - function to handle encodings (likely engine.write)
+ * @return Calls callback with Array of encodings
+ * @api public
+ */
+
+Encoder.prototype.encode = function(obj, callback){
+  debug('encoding packet %j', obj);
+
+  if (exports.BINARY_EVENT === obj.type || exports.BINARY_ACK === obj.type) {
+    encodeAsBinary(obj, callback);
+  } else {
+    var encoding = encodeAsString(obj);
+    callback([encoding]);
+  }
+};
+
+/**
+ * Encode packet as string.
+ *
+ * @param {Object} packet
+ * @return {String} encoded
+ * @api private
+ */
+
+function encodeAsString(obj) {
+
+  // first is type
+  var str = '' + obj.type;
+
+  // attachments if we have them
+  if (exports.BINARY_EVENT === obj.type || exports.BINARY_ACK === obj.type) {
+    str += obj.attachments + '-';
+  }
+
+  // if we have a namespace other than `/`
+  // we append it followed by a comma `,`
+  if (obj.nsp && '/' !== obj.nsp) {
+    str += obj.nsp + ',';
+  }
+
+  // immediately followed by the id
+  if (null != obj.id) {
+    str += obj.id;
+  }
+
+  // json data
+  if (null != obj.data) {
+    var payload = tryStringify(obj.data);
+    if (payload !== false) {
+      str += payload;
+    } else {
+      return ERROR_PACKET;
+    }
+  }
+
+  debug('encoded %j as %s', obj, str);
+  return str;
+}
+
+function tryStringify(str) {
+  try {
+    return JSON.stringify(str);
+  } catch(e){
+    return false;
+  }
+}
+
+/**
+ * Encode packet as 'buffer sequence' by removing blobs, and
+ * deconstructing packet into object with placeholders and
+ * a list of buffers.
+ *
+ * @param {Object} packet
+ * @return {Buffer} encoded
+ * @api private
+ */
+
+function encodeAsBinary(obj, callback) {
+
+  function writeEncoding(bloblessData) {
+    var deconstruction = binary.deconstructPacket(bloblessData);
+    var pack = encodeAsString(deconstruction.packet);
+    var buffers = deconstruction.buffers;
+
+    buffers.unshift(pack); // add packet info to beginning of data list
+    callback(buffers); // write all the buffers
+  }
+
+  binary.removeBlobs(obj, writeEncoding);
+}
+
+/**
+ * A socket.io Decoder instance
+ *
+ * @return {Object} decoder
+ * @api public
+ */
+
+function Decoder() {
+  this.reconstructor = null;
+}
+
+/**
+ * Mix in `Emitter` with Decoder.
+ */
+
+Emitter(Decoder.prototype);
+
+/**
+ * Decodes an ecoded packet string into packet JSON.
+ *
+ * @param {String} obj - encoded packet
+ * @return {Object} packet
+ * @api public
+ */
+
+Decoder.prototype.add = function(obj) {
+  var packet;
+  if (typeof obj === 'string') {
+    packet = decodeString(obj);
+    if (exports.BINARY_EVENT === packet.type || exports.BINARY_ACK === packet.type) { // binary packet's json
+      this.reconstructor = new BinaryReconstructor(packet);
+
+      // no attachments, labeled binary but no binary data to follow
+      if (this.reconstructor.reconPack.attachments === 0) {
+        this.emit('decoded', packet);
+      }
+    } else { // non-binary full packet
+      this.emit('decoded', packet);
+    }
+  }
+  else if (isBuf(obj) || obj.base64) { // raw binary data
+    if (!this.reconstructor) {
+      throw new Error('got binary data when not reconstructing a packet');
+    } else {
+      packet = this.reconstructor.takeBinaryData(obj);
+      if (packet) { // received final buffer
+        this.reconstructor = null;
+        this.emit('decoded', packet);
+      }
+    }
+  }
+  else {
+    throw new Error('Unknown type: ' + obj);
+  }
+};
+
+/**
+ * Decode a packet String (JSON data)
+ *
+ * @param {String} str
+ * @return {Object} packet
+ * @api private
+ */
+
+function decodeString(str) {
+  var i = 0;
+  // look up type
+  var p = {
+    type: Number(str.charAt(0))
+  };
+
+  if (null == exports.types[p.type]) {
+    return error('unknown packet type ' + p.type);
+  }
+
+  // look up attachments if type binary
+  if (exports.BINARY_EVENT === p.type || exports.BINARY_ACK === p.type) {
+    var buf = '';
+    while (str.charAt(++i) !== '-') {
+      buf += str.charAt(i);
+      if (i == str.length) break;
+    }
+    if (buf != Number(buf) || str.charAt(i) !== '-') {
+      throw new Error('Illegal attachments');
+    }
+    p.attachments = Number(buf);
+  }
+
+  // look up namespace (if any)
+  if ('/' === str.charAt(i + 1)) {
+    p.nsp = '';
+    while (++i) {
+      var c = str.charAt(i);
+      if (',' === c) break;
+      p.nsp += c;
+      if (i === str.length) break;
+    }
+  } else {
+    p.nsp = '/';
+  }
+
+  // look up id
+  var next = str.charAt(i + 1);
+  if ('' !== next && Number(next) == next) {
+    p.id = '';
+    while (++i) {
+      var c = str.charAt(i);
+      if (null == c || Number(c) != c) {
+        --i;
+        break;
+      }
+      p.id += str.charAt(i);
+      if (i === str.length) break;
+    }
+    p.id = Number(p.id);
+  }
+
+  // look up json data
+  if (str.charAt(++i)) {
+    var payload = tryParse(str.substr(i));
+    var isPayloadValid = payload !== false && (p.type === exports.ERROR || isArray(payload));
+    if (isPayloadValid) {
+      p.data = payload;
+    } else {
+      return error('invalid payload');
+    }
+  }
+
+  debug('decoded %s as %j', str, p);
+  return p;
+}
+
+function tryParse(str) {
+  try {
+    return JSON.parse(str);
+  } catch(e){
+    return false;
+  }
+}
+
+/**
+ * Deallocates a parser's resources
+ *
+ * @api public
+ */
+
+Decoder.prototype.destroy = function() {
+  if (this.reconstructor) {
+    this.reconstructor.finishedReconstruction();
+  }
+};
+
+/**
+ * A manager of a binary event's 'buffer sequence'. Should
+ * be constructed whenever a packet of type BINARY_EVENT is
+ * decoded.
+ *
+ * @param {Object} packet
+ * @return {BinaryReconstructor} initialized reconstructor
+ * @api private
+ */
+
+function BinaryReconstructor(packet) {
+  this.reconPack = packet;
+  this.buffers = [];
+}
+
+/**
+ * Method to be called when binary data received from connection
+ * after a BINARY_EVENT packet.
+ *
+ * @param {Buffer | ArrayBuffer} binData - the raw binary data received
+ * @return {null | Object} returns null if more binary data is expected or
+ *   a reconstructed packet object if all buffers have been received.
+ * @api private
+ */
+
+BinaryReconstructor.prototype.takeBinaryData = function(binData) {
+  this.buffers.push(binData);
+  if (this.buffers.length === this.reconPack.attachments) { // done with buffer list
+    var packet = binary.reconstructPacket(this.reconPack, this.buffers);
+    this.finishedReconstruction();
+    return packet;
+  }
+  return null;
+};
+
+/**
+ * Cleans up binary packet reconstruction variables.
+ *
+ * @api private
+ */
+
+BinaryReconstructor.prototype.finishedReconstruction = function() {
+  this.reconPack = null;
+  this.buffers = [];
+};
+
+function error(msg) {
+  return {
+    type: exports.ERROR,
+    data: 'parser error: ' + msg
+  };
+}
+
+},{"debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js","component-emitter":"../node_modules/darklaunch-js/node_modules/component-emitter/index.js","./binary":"../node_modules/darklaunch-js/node_modules/socket.io-parser/binary.js","isarray":"../node_modules/darklaunch-js/node_modules/isarray/index.js","./is-buffer":"../node_modules/darklaunch-js/node_modules/socket.io-parser/is-buffer.js"}],"../node_modules/darklaunch-js/node_modules/has-cors/index.js":[function(require,module,exports) {
+
+/**
+ * Module exports.
+ *
+ * Logic borrowed from Modernizr:
+ *
+ *   - https://github.com/Modernizr/Modernizr/blob/master/feature-detects/cors.js
+ */
+
+try {
+  module.exports = typeof XMLHttpRequest !== 'undefined' &&
+    'withCredentials' in new XMLHttpRequest();
+} catch (err) {
+  // if XMLHttp support is disabled in IE then it will throw
+  // when trying to create
+  module.exports = false;
+}
+
+},{}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/xmlhttprequest.js":[function(require,module,exports) {
+var global = arguments[3];
+// browser shim for xmlhttprequest module
+
+var hasCORS = require('has-cors');
+
+module.exports = function (opts) {
+  var xdomain = opts.xdomain;
+
+  // scheme must be same when usign XDomainRequest
+  // http://blogs.msdn.com/b/ieinternals/archive/2010/05/13/xdomainrequest-restrictions-limitations-and-workarounds.aspx
+  var xscheme = opts.xscheme;
+
+  // XDomainRequest has a flow of not sending cookie, therefore it should be disabled as a default.
+  // https://github.com/Automattic/engine.io-client/pull/217
+  var enablesXDR = opts.enablesXDR;
+
+  // XMLHttpRequest can be disabled on IE
+  try {
+    if ('undefined' !== typeof XMLHttpRequest && (!xdomain || hasCORS)) {
+      return new XMLHttpRequest();
+    }
+  } catch (e) { }
+
+  // Use XDomainRequest for IE8 if enablesXDR is true
+  // because loading bar keeps flashing when using jsonp-polling
+  // https://github.com/yujiosaka/socke.io-ie8-loading-example
+  try {
+    if ('undefined' !== typeof XDomainRequest && !xscheme && enablesXDR) {
+      return new XDomainRequest();
+    }
+  } catch (e) { }
+
+  if (!xdomain) {
+    try {
+      return new global[['Active'].concat('Object').join('X')]('Microsoft.XMLHTTP');
+    } catch (e) { }
+  }
+};
+
+},{"has-cors":"../node_modules/darklaunch-js/node_modules/has-cors/index.js"}],"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/keys.js":[function(require,module,exports) {
+
+/**
+ * Gets the keys for an object.
+ *
+ * @return {Array} keys
+ * @api private
+ */
+
+module.exports = Object.keys || function keys (obj){
+  var arr = [];
+  var has = Object.prototype.hasOwnProperty;
+
+  for (var i in obj) {
+    if (has.call(obj, i)) {
+      arr.push(i);
+    }
+  }
+  return arr;
 };
 
 },{}],"../node_modules/base64-js/index.js":[function(require,module,exports) {
@@ -31872,676 +32200,7 @@ function isnan (val) {
   return val !== val // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":"../node_modules/base64-js/index.js","ieee754":"../node_modules/ieee754/index.js","isarray":"../node_modules/isarray/index.js","buffer":"../node_modules/buffer/index.js"}],"../node_modules/socket.io-parser/is-buffer.js":[function(require,module,exports) {
-var Buffer = require("buffer").Buffer;
-
-module.exports = isBuf;
-
-var withNativeBuffer = typeof Buffer === 'function' && typeof Buffer.isBuffer === 'function';
-var withNativeArrayBuffer = typeof ArrayBuffer === 'function';
-
-var isView = function (obj) {
-  return typeof ArrayBuffer.isView === 'function' ? ArrayBuffer.isView(obj) : (obj.buffer instanceof ArrayBuffer);
-};
-
-/**
- * Returns true if obj is a buffer or an arraybuffer.
- *
- * @api private
- */
-
-function isBuf(obj) {
-  return (withNativeBuffer && Buffer.isBuffer(obj)) ||
-          (withNativeArrayBuffer && (obj instanceof ArrayBuffer || isView(obj)));
-}
-
-},{"buffer":"../node_modules/buffer/index.js"}],"../node_modules/socket.io-parser/binary.js":[function(require,module,exports) {
-/*global Blob,File*/
-
-/**
- * Module requirements
- */
-
-var isArray = require('isarray');
-var isBuf = require('./is-buffer');
-var toString = Object.prototype.toString;
-var withNativeBlob = typeof Blob === 'function' || (typeof Blob !== 'undefined' && toString.call(Blob) === '[object BlobConstructor]');
-var withNativeFile = typeof File === 'function' || (typeof File !== 'undefined' && toString.call(File) === '[object FileConstructor]');
-
-/**
- * Replaces every Buffer | ArrayBuffer in packet with a numbered placeholder.
- * Anything with blobs or files should be fed through removeBlobs before coming
- * here.
- *
- * @param {Object} packet - socket.io event packet
- * @return {Object} with deconstructed packet and list of buffers
- * @api public
- */
-
-exports.deconstructPacket = function(packet) {
-  var buffers = [];
-  var packetData = packet.data;
-  var pack = packet;
-  pack.data = _deconstructPacket(packetData, buffers);
-  pack.attachments = buffers.length; // number of binary 'attachments'
-  return {packet: pack, buffers: buffers};
-};
-
-function _deconstructPacket(data, buffers) {
-  if (!data) return data;
-
-  if (isBuf(data)) {
-    var placeholder = { _placeholder: true, num: buffers.length };
-    buffers.push(data);
-    return placeholder;
-  } else if (isArray(data)) {
-    var newData = new Array(data.length);
-    for (var i = 0; i < data.length; i++) {
-      newData[i] = _deconstructPacket(data[i], buffers);
-    }
-    return newData;
-  } else if (typeof data === 'object' && !(data instanceof Date)) {
-    var newData = {};
-    for (var key in data) {
-      newData[key] = _deconstructPacket(data[key], buffers);
-    }
-    return newData;
-  }
-  return data;
-}
-
-/**
- * Reconstructs a binary packet from its placeholder packet and buffers
- *
- * @param {Object} packet - event packet with placeholders
- * @param {Array} buffers - binary buffers to put in placeholder positions
- * @return {Object} reconstructed packet
- * @api public
- */
-
-exports.reconstructPacket = function(packet, buffers) {
-  packet.data = _reconstructPacket(packet.data, buffers);
-  packet.attachments = undefined; // no longer useful
-  return packet;
-};
-
-function _reconstructPacket(data, buffers) {
-  if (!data) return data;
-
-  if (data && data._placeholder) {
-    return buffers[data.num]; // appropriate buffer (should be natural order anyway)
-  } else if (isArray(data)) {
-    for (var i = 0; i < data.length; i++) {
-      data[i] = _reconstructPacket(data[i], buffers);
-    }
-  } else if (typeof data === 'object') {
-    for (var key in data) {
-      data[key] = _reconstructPacket(data[key], buffers);
-    }
-  }
-
-  return data;
-}
-
-/**
- * Asynchronously removes Blobs or Files from data via
- * FileReader's readAsArrayBuffer method. Used before encoding
- * data as msgpack. Calls callback with the blobless data.
- *
- * @param {Object} data
- * @param {Function} callback
- * @api private
- */
-
-exports.removeBlobs = function(data, callback) {
-  function _removeBlobs(obj, curKey, containingObject) {
-    if (!obj) return obj;
-
-    // convert any blob
-    if ((withNativeBlob && obj instanceof Blob) ||
-        (withNativeFile && obj instanceof File)) {
-      pendingBlobs++;
-
-      // async filereader
-      var fileReader = new FileReader();
-      fileReader.onload = function() { // this.result == arraybuffer
-        if (containingObject) {
-          containingObject[curKey] = this.result;
-        }
-        else {
-          bloblessData = this.result;
-        }
-
-        // if nothing pending its callback time
-        if(! --pendingBlobs) {
-          callback(bloblessData);
-        }
-      };
-
-      fileReader.readAsArrayBuffer(obj); // blob -> arraybuffer
-    } else if (isArray(obj)) { // handle array
-      for (var i = 0; i < obj.length; i++) {
-        _removeBlobs(obj[i], i, obj);
-      }
-    } else if (typeof obj === 'object' && !isBuf(obj)) { // and object
-      for (var key in obj) {
-        _removeBlobs(obj[key], key, obj);
-      }
-    }
-  }
-
-  var pendingBlobs = 0;
-  var bloblessData = data;
-  _removeBlobs(bloblessData);
-  if (!pendingBlobs) {
-    callback(bloblessData);
-  }
-};
-
-},{"isarray":"../node_modules/socket.io-parser/node_modules/isarray/index.js","./is-buffer":"../node_modules/socket.io-parser/is-buffer.js"}],"../node_modules/socket.io-parser/index.js":[function(require,module,exports) {
-
-/**
- * Module dependencies.
- */
-
-var debug = require('debug')('socket.io-parser');
-var Emitter = require('component-emitter');
-var binary = require('./binary');
-var isArray = require('isarray');
-var isBuf = require('./is-buffer');
-
-/**
- * Protocol version.
- *
- * @api public
- */
-
-exports.protocol = 4;
-
-/**
- * Packet types.
- *
- * @api public
- */
-
-exports.types = [
-  'CONNECT',
-  'DISCONNECT',
-  'EVENT',
-  'ACK',
-  'ERROR',
-  'BINARY_EVENT',
-  'BINARY_ACK'
-];
-
-/**
- * Packet type `connect`.
- *
- * @api public
- */
-
-exports.CONNECT = 0;
-
-/**
- * Packet type `disconnect`.
- *
- * @api public
- */
-
-exports.DISCONNECT = 1;
-
-/**
- * Packet type `event`.
- *
- * @api public
- */
-
-exports.EVENT = 2;
-
-/**
- * Packet type `ack`.
- *
- * @api public
- */
-
-exports.ACK = 3;
-
-/**
- * Packet type `error`.
- *
- * @api public
- */
-
-exports.ERROR = 4;
-
-/**
- * Packet type 'binary event'
- *
- * @api public
- */
-
-exports.BINARY_EVENT = 5;
-
-/**
- * Packet type `binary ack`. For acks with binary arguments.
- *
- * @api public
- */
-
-exports.BINARY_ACK = 6;
-
-/**
- * Encoder constructor.
- *
- * @api public
- */
-
-exports.Encoder = Encoder;
-
-/**
- * Decoder constructor.
- *
- * @api public
- */
-
-exports.Decoder = Decoder;
-
-/**
- * A socket.io Encoder instance
- *
- * @api public
- */
-
-function Encoder() {}
-
-var ERROR_PACKET = exports.ERROR + '"encode error"';
-
-/**
- * Encode a packet as a single string if non-binary, or as a
- * buffer sequence, depending on packet type.
- *
- * @param {Object} obj - packet object
- * @param {Function} callback - function to handle encodings (likely engine.write)
- * @return Calls callback with Array of encodings
- * @api public
- */
-
-Encoder.prototype.encode = function(obj, callback){
-  debug('encoding packet %j', obj);
-
-  if (exports.BINARY_EVENT === obj.type || exports.BINARY_ACK === obj.type) {
-    encodeAsBinary(obj, callback);
-  } else {
-    var encoding = encodeAsString(obj);
-    callback([encoding]);
-  }
-};
-
-/**
- * Encode packet as string.
- *
- * @param {Object} packet
- * @return {String} encoded
- * @api private
- */
-
-function encodeAsString(obj) {
-
-  // first is type
-  var str = '' + obj.type;
-
-  // attachments if we have them
-  if (exports.BINARY_EVENT === obj.type || exports.BINARY_ACK === obj.type) {
-    str += obj.attachments + '-';
-  }
-
-  // if we have a namespace other than `/`
-  // we append it followed by a comma `,`
-  if (obj.nsp && '/' !== obj.nsp) {
-    str += obj.nsp + ',';
-  }
-
-  // immediately followed by the id
-  if (null != obj.id) {
-    str += obj.id;
-  }
-
-  // json data
-  if (null != obj.data) {
-    var payload = tryStringify(obj.data);
-    if (payload !== false) {
-      str += payload;
-    } else {
-      return ERROR_PACKET;
-    }
-  }
-
-  debug('encoded %j as %s', obj, str);
-  return str;
-}
-
-function tryStringify(str) {
-  try {
-    return JSON.stringify(str);
-  } catch(e){
-    return false;
-  }
-}
-
-/**
- * Encode packet as 'buffer sequence' by removing blobs, and
- * deconstructing packet into object with placeholders and
- * a list of buffers.
- *
- * @param {Object} packet
- * @return {Buffer} encoded
- * @api private
- */
-
-function encodeAsBinary(obj, callback) {
-
-  function writeEncoding(bloblessData) {
-    var deconstruction = binary.deconstructPacket(bloblessData);
-    var pack = encodeAsString(deconstruction.packet);
-    var buffers = deconstruction.buffers;
-
-    buffers.unshift(pack); // add packet info to beginning of data list
-    callback(buffers); // write all the buffers
-  }
-
-  binary.removeBlobs(obj, writeEncoding);
-}
-
-/**
- * A socket.io Decoder instance
- *
- * @return {Object} decoder
- * @api public
- */
-
-function Decoder() {
-  this.reconstructor = null;
-}
-
-/**
- * Mix in `Emitter` with Decoder.
- */
-
-Emitter(Decoder.prototype);
-
-/**
- * Decodes an encoded packet string into packet JSON.
- *
- * @param {String} obj - encoded packet
- * @return {Object} packet
- * @api public
- */
-
-Decoder.prototype.add = function(obj) {
-  var packet;
-  if (typeof obj === 'string') {
-    packet = decodeString(obj);
-    if (exports.BINARY_EVENT === packet.type || exports.BINARY_ACK === packet.type) { // binary packet's json
-      this.reconstructor = new BinaryReconstructor(packet);
-
-      // no attachments, labeled binary but no binary data to follow
-      if (this.reconstructor.reconPack.attachments === 0) {
-        this.emit('decoded', packet);
-      }
-    } else { // non-binary full packet
-      this.emit('decoded', packet);
-    }
-  } else if (isBuf(obj) || obj.base64) { // raw binary data
-    if (!this.reconstructor) {
-      throw new Error('got binary data when not reconstructing a packet');
-    } else {
-      packet = this.reconstructor.takeBinaryData(obj);
-      if (packet) { // received final buffer
-        this.reconstructor = null;
-        this.emit('decoded', packet);
-      }
-    }
-  } else {
-    throw new Error('Unknown type: ' + obj);
-  }
-};
-
-/**
- * Decode a packet String (JSON data)
- *
- * @param {String} str
- * @return {Object} packet
- * @api private
- */
-
-function decodeString(str) {
-  var i = 0;
-  // look up type
-  var p = {
-    type: Number(str.charAt(0))
-  };
-
-  if (null == exports.types[p.type]) {
-    return error('unknown packet type ' + p.type);
-  }
-
-  // look up attachments if type binary
-  if (exports.BINARY_EVENT === p.type || exports.BINARY_ACK === p.type) {
-    var buf = '';
-    while (str.charAt(++i) !== '-') {
-      buf += str.charAt(i);
-      if (i == str.length) break;
-    }
-    if (buf != Number(buf) || str.charAt(i) !== '-') {
-      throw new Error('Illegal attachments');
-    }
-    p.attachments = Number(buf);
-  }
-
-  // look up namespace (if any)
-  if ('/' === str.charAt(i + 1)) {
-    p.nsp = '';
-    while (++i) {
-      var c = str.charAt(i);
-      if (',' === c) break;
-      p.nsp += c;
-      if (i === str.length) break;
-    }
-  } else {
-    p.nsp = '/';
-  }
-
-  // look up id
-  var next = str.charAt(i + 1);
-  if ('' !== next && Number(next) == next) {
-    p.id = '';
-    while (++i) {
-      var c = str.charAt(i);
-      if (null == c || Number(c) != c) {
-        --i;
-        break;
-      }
-      p.id += str.charAt(i);
-      if (i === str.length) break;
-    }
-    p.id = Number(p.id);
-  }
-
-  // look up json data
-  if (str.charAt(++i)) {
-    var payload = tryParse(str.substr(i));
-    var isPayloadValid = payload !== false && (p.type === exports.ERROR || isArray(payload));
-    if (isPayloadValid) {
-      p.data = payload;
-    } else {
-      return error('invalid payload');
-    }
-  }
-
-  debug('decoded %s as %j', str, p);
-  return p;
-}
-
-function tryParse(str) {
-  try {
-    return JSON.parse(str);
-  } catch(e){
-    return false;
-  }
-}
-
-/**
- * Deallocates a parser's resources
- *
- * @api public
- */
-
-Decoder.prototype.destroy = function() {
-  if (this.reconstructor) {
-    this.reconstructor.finishedReconstruction();
-  }
-};
-
-/**
- * A manager of a binary event's 'buffer sequence'. Should
- * be constructed whenever a packet of type BINARY_EVENT is
- * decoded.
- *
- * @param {Object} packet
- * @return {BinaryReconstructor} initialized reconstructor
- * @api private
- */
-
-function BinaryReconstructor(packet) {
-  this.reconPack = packet;
-  this.buffers = [];
-}
-
-/**
- * Method to be called when binary data received from connection
- * after a BINARY_EVENT packet.
- *
- * @param {Buffer | ArrayBuffer} binData - the raw binary data received
- * @return {null | Object} returns null if more binary data is expected or
- *   a reconstructed packet object if all buffers have been received.
- * @api private
- */
-
-BinaryReconstructor.prototype.takeBinaryData = function(binData) {
-  this.buffers.push(binData);
-  if (this.buffers.length === this.reconPack.attachments) { // done with buffer list
-    var packet = binary.reconstructPacket(this.reconPack, this.buffers);
-    this.finishedReconstruction();
-    return packet;
-  }
-  return null;
-};
-
-/**
- * Cleans up binary packet reconstruction variables.
- *
- * @api private
- */
-
-BinaryReconstructor.prototype.finishedReconstruction = function() {
-  this.reconPack = null;
-  this.buffers = [];
-};
-
-function error(msg) {
-  return {
-    type: exports.ERROR,
-    data: 'parser error: ' + msg
-  };
-}
-
-},{"debug":"../node_modules/socket.io-parser/node_modules/debug/src/browser.js","component-emitter":"../node_modules/component-emitter/index.js","./binary":"../node_modules/socket.io-parser/binary.js","isarray":"../node_modules/socket.io-parser/node_modules/isarray/index.js","./is-buffer":"../node_modules/socket.io-parser/is-buffer.js"}],"../node_modules/has-cors/index.js":[function(require,module,exports) {
-
-/**
- * Module exports.
- *
- * Logic borrowed from Modernizr:
- *
- *   - https://github.com/Modernizr/Modernizr/blob/master/feature-detects/cors.js
- */
-
-try {
-  module.exports = typeof XMLHttpRequest !== 'undefined' &&
-    'withCredentials' in new XMLHttpRequest();
-} catch (err) {
-  // if XMLHttp support is disabled in IE then it will throw
-  // when trying to create
-  module.exports = false;
-}
-
-},{}],"../node_modules/engine.io-client/lib/xmlhttprequest.js":[function(require,module,exports) {
-// browser shim for xmlhttprequest module
-
-var hasCORS = require('has-cors');
-
-module.exports = function (opts) {
-  var xdomain = opts.xdomain;
-
-  // scheme must be same when usign XDomainRequest
-  // http://blogs.msdn.com/b/ieinternals/archive/2010/05/13/xdomainrequest-restrictions-limitations-and-workarounds.aspx
-  var xscheme = opts.xscheme;
-
-  // XDomainRequest has a flow of not sending cookie, therefore it should be disabled as a default.
-  // https://github.com/Automattic/engine.io-client/pull/217
-  var enablesXDR = opts.enablesXDR;
-
-  // XMLHttpRequest can be disabled on IE
-  try {
-    if ('undefined' !== typeof XMLHttpRequest && (!xdomain || hasCORS)) {
-      return new XMLHttpRequest();
-    }
-  } catch (e) { }
-
-  // Use XDomainRequest for IE8 if enablesXDR is true
-  // because loading bar keeps flashing when using jsonp-polling
-  // https://github.com/yujiosaka/socke.io-ie8-loading-example
-  try {
-    if ('undefined' !== typeof XDomainRequest && !xscheme && enablesXDR) {
-      return new XDomainRequest();
-    }
-  } catch (e) { }
-
-  if (!xdomain) {
-    try {
-      return new self[['Active'].concat('Object').join('X')]('Microsoft.XMLHTTP');
-    } catch (e) { }
-  }
-};
-
-},{"has-cors":"../node_modules/has-cors/index.js"}],"../node_modules/engine.io-parser/lib/keys.js":[function(require,module,exports) {
-
-/**
- * Gets the keys for an object.
- *
- * @return {Array} keys
- * @api private
- */
-
-module.exports = Object.keys || function keys (obj){
-  var arr = [];
-  var has = Object.prototype.hasOwnProperty;
-
-  for (var i in obj) {
-    if (has.call(obj, i)) {
-      arr.push(i);
-    }
-  }
-  return arr;
-};
-
-},{}],"../node_modules/has-binary2/node_modules/isarray/index.js":[function(require,module,exports) {
-var toString = {}.toString;
-
-module.exports = Array.isArray || function (arr) {
-  return toString.call(arr) == '[object Array]';
-};
-
-},{}],"../node_modules/has-binary2/index.js":[function(require,module,exports) {
+},{"base64-js":"../node_modules/base64-js/index.js","ieee754":"../node_modules/ieee754/index.js","isarray":"../node_modules/isarray/index.js","buffer":"../node_modules/buffer/index.js"}],"../node_modules/darklaunch-js/node_modules/has-binary2/index.js":[function(require,module,exports) {
 var Buffer = require("buffer").Buffer;
 /* global Blob File */
 
@@ -32608,7 +32267,7 @@ function hasBinary (obj) {
   return false;
 }
 
-},{"isarray":"../node_modules/has-binary2/node_modules/isarray/index.js","buffer":"../node_modules/buffer/index.js"}],"../node_modules/arraybuffer.slice/index.js":[function(require,module,exports) {
+},{"isarray":"../node_modules/darklaunch-js/node_modules/isarray/index.js","buffer":"../node_modules/buffer/index.js"}],"../node_modules/darklaunch-js/node_modules/arraybuffer.slice/index.js":[function(require,module,exports) {
 /**
  * An abstraction for slicing an arraybuffer even when
  * ArrayBuffer.prototype.slice is not supported
@@ -32639,7 +32298,7 @@ module.exports = function(arraybuffer, start, end) {
   return result.buffer;
 };
 
-},{}],"../node_modules/after/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/after/index.js":[function(require,module,exports) {
 module.exports = after
 
 function after(count, callback, err_cb) {
@@ -32669,219 +32328,266 @@ function after(count, callback, err_cb) {
 
 function noop() {}
 
-},{}],"../node_modules/engine.io-parser/lib/utf8.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/utf8.js":[function(require,module,exports) {
+var global = arguments[3];
+var define;
 /*! https://mths.be/utf8js v2.1.2 by @mathias */
+;(function(root) {
 
-var stringFromCharCode = String.fromCharCode;
+	// Detect free variables `exports`
+	var freeExports = typeof exports == 'object' && exports;
 
-// Taken from https://mths.be/punycode
-function ucs2decode(string) {
-	var output = [];
-	var counter = 0;
-	var length = string.length;
-	var value;
-	var extra;
-	while (counter < length) {
-		value = string.charCodeAt(counter++);
-		if (value >= 0xD800 && value <= 0xDBFF && counter < length) {
-			// high surrogate, and there is a next character
-			extra = string.charCodeAt(counter++);
-			if ((extra & 0xFC00) == 0xDC00) { // low surrogate
-				output.push(((value & 0x3FF) << 10) + (extra & 0x3FF) + 0x10000);
+	// Detect free variable `module`
+	var freeModule = typeof module == 'object' && module &&
+		module.exports == freeExports && module;
+
+	// Detect free variable `global`, from Node.js or Browserified code,
+	// and use it as `root`
+	var freeGlobal = typeof global == 'object' && global;
+	if (freeGlobal.global === freeGlobal || freeGlobal.window === freeGlobal) {
+		root = freeGlobal;
+	}
+
+	/*--------------------------------------------------------------------------*/
+
+	var stringFromCharCode = String.fromCharCode;
+
+	// Taken from https://mths.be/punycode
+	function ucs2decode(string) {
+		var output = [];
+		var counter = 0;
+		var length = string.length;
+		var value;
+		var extra;
+		while (counter < length) {
+			value = string.charCodeAt(counter++);
+			if (value >= 0xD800 && value <= 0xDBFF && counter < length) {
+				// high surrogate, and there is a next character
+				extra = string.charCodeAt(counter++);
+				if ((extra & 0xFC00) == 0xDC00) { // low surrogate
+					output.push(((value & 0x3FF) << 10) + (extra & 0x3FF) + 0x10000);
+				} else {
+					// unmatched surrogate; only append this code unit, in case the next
+					// code unit is the high surrogate of a surrogate pair
+					output.push(value);
+					counter--;
+				}
 			} else {
-				// unmatched surrogate; only append this code unit, in case the next
-				// code unit is the high surrogate of a surrogate pair
 				output.push(value);
-				counter--;
 			}
-		} else {
-			output.push(value);
 		}
+		return output;
 	}
-	return output;
-}
 
-// Taken from https://mths.be/punycode
-function ucs2encode(array) {
-	var length = array.length;
-	var index = -1;
-	var value;
-	var output = '';
-	while (++index < length) {
-		value = array[index];
-		if (value > 0xFFFF) {
-			value -= 0x10000;
-			output += stringFromCharCode(value >>> 10 & 0x3FF | 0xD800);
-			value = 0xDC00 | value & 0x3FF;
+	// Taken from https://mths.be/punycode
+	function ucs2encode(array) {
+		var length = array.length;
+		var index = -1;
+		var value;
+		var output = '';
+		while (++index < length) {
+			value = array[index];
+			if (value > 0xFFFF) {
+				value -= 0x10000;
+				output += stringFromCharCode(value >>> 10 & 0x3FF | 0xD800);
+				value = 0xDC00 | value & 0x3FF;
+			}
+			output += stringFromCharCode(value);
 		}
-		output += stringFromCharCode(value);
+		return output;
 	}
-	return output;
-}
 
-function checkScalarValue(codePoint, strict) {
-	if (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
-		if (strict) {
-			throw Error(
-				'Lone surrogate U+' + codePoint.toString(16).toUpperCase() +
-				' is not a scalar value'
-			);
+	function checkScalarValue(codePoint, strict) {
+		if (codePoint >= 0xD800 && codePoint <= 0xDFFF) {
+			if (strict) {
+				throw Error(
+					'Lone surrogate U+' + codePoint.toString(16).toUpperCase() +
+					' is not a scalar value'
+				);
+			}
+			return false;
 		}
-		return false;
+		return true;
 	}
-	return true;
-}
-/*--------------------------------------------------------------------------*/
+	/*--------------------------------------------------------------------------*/
 
-function createByte(codePoint, shift) {
-	return stringFromCharCode(((codePoint >> shift) & 0x3F) | 0x80);
-}
+	function createByte(codePoint, shift) {
+		return stringFromCharCode(((codePoint >> shift) & 0x3F) | 0x80);
+	}
 
-function encodeCodePoint(codePoint, strict) {
-	if ((codePoint & 0xFFFFFF80) == 0) { // 1-byte sequence
-		return stringFromCharCode(codePoint);
-	}
-	var symbol = '';
-	if ((codePoint & 0xFFFFF800) == 0) { // 2-byte sequence
-		symbol = stringFromCharCode(((codePoint >> 6) & 0x1F) | 0xC0);
-	}
-	else if ((codePoint & 0xFFFF0000) == 0) { // 3-byte sequence
-		if (!checkScalarValue(codePoint, strict)) {
-			codePoint = 0xFFFD;
+	function encodeCodePoint(codePoint, strict) {
+		if ((codePoint & 0xFFFFFF80) == 0) { // 1-byte sequence
+			return stringFromCharCode(codePoint);
 		}
-		symbol = stringFromCharCode(((codePoint >> 12) & 0x0F) | 0xE0);
-		symbol += createByte(codePoint, 6);
-	}
-	else if ((codePoint & 0xFFE00000) == 0) { // 4-byte sequence
-		symbol = stringFromCharCode(((codePoint >> 18) & 0x07) | 0xF0);
-		symbol += createByte(codePoint, 12);
-		symbol += createByte(codePoint, 6);
-	}
-	symbol += stringFromCharCode((codePoint & 0x3F) | 0x80);
-	return symbol;
-}
-
-function utf8encode(string, opts) {
-	opts = opts || {};
-	var strict = false !== opts.strict;
-
-	var codePoints = ucs2decode(string);
-	var length = codePoints.length;
-	var index = -1;
-	var codePoint;
-	var byteString = '';
-	while (++index < length) {
-		codePoint = codePoints[index];
-		byteString += encodeCodePoint(codePoint, strict);
-	}
-	return byteString;
-}
-
-/*--------------------------------------------------------------------------*/
-
-function readContinuationByte() {
-	if (byteIndex >= byteCount) {
-		throw Error('Invalid byte index');
-	}
-
-	var continuationByte = byteArray[byteIndex] & 0xFF;
-	byteIndex++;
-
-	if ((continuationByte & 0xC0) == 0x80) {
-		return continuationByte & 0x3F;
-	}
-
-	// If we end up here, it’s not a continuation byte
-	throw Error('Invalid continuation byte');
-}
-
-function decodeSymbol(strict) {
-	var byte1;
-	var byte2;
-	var byte3;
-	var byte4;
-	var codePoint;
-
-	if (byteIndex > byteCount) {
-		throw Error('Invalid byte index');
-	}
-
-	if (byteIndex == byteCount) {
-		return false;
-	}
-
-	// Read first byte
-	byte1 = byteArray[byteIndex] & 0xFF;
-	byteIndex++;
-
-	// 1-byte sequence (no continuation bytes)
-	if ((byte1 & 0x80) == 0) {
-		return byte1;
-	}
-
-	// 2-byte sequence
-	if ((byte1 & 0xE0) == 0xC0) {
-		byte2 = readContinuationByte();
-		codePoint = ((byte1 & 0x1F) << 6) | byte2;
-		if (codePoint >= 0x80) {
-			return codePoint;
-		} else {
-			throw Error('Invalid continuation byte');
+		var symbol = '';
+		if ((codePoint & 0xFFFFF800) == 0) { // 2-byte sequence
+			symbol = stringFromCharCode(((codePoint >> 6) & 0x1F) | 0xC0);
 		}
-	}
-
-	// 3-byte sequence (may include unpaired surrogates)
-	if ((byte1 & 0xF0) == 0xE0) {
-		byte2 = readContinuationByte();
-		byte3 = readContinuationByte();
-		codePoint = ((byte1 & 0x0F) << 12) | (byte2 << 6) | byte3;
-		if (codePoint >= 0x0800) {
-			return checkScalarValue(codePoint, strict) ? codePoint : 0xFFFD;
-		} else {
-			throw Error('Invalid continuation byte');
+		else if ((codePoint & 0xFFFF0000) == 0) { // 3-byte sequence
+			if (!checkScalarValue(codePoint, strict)) {
+				codePoint = 0xFFFD;
+			}
+			symbol = stringFromCharCode(((codePoint >> 12) & 0x0F) | 0xE0);
+			symbol += createByte(codePoint, 6);
 		}
-	}
-
-	// 4-byte sequence
-	if ((byte1 & 0xF8) == 0xF0) {
-		byte2 = readContinuationByte();
-		byte3 = readContinuationByte();
-		byte4 = readContinuationByte();
-		codePoint = ((byte1 & 0x07) << 0x12) | (byte2 << 0x0C) |
-			(byte3 << 0x06) | byte4;
-		if (codePoint >= 0x010000 && codePoint <= 0x10FFFF) {
-			return codePoint;
+		else if ((codePoint & 0xFFE00000) == 0) { // 4-byte sequence
+			symbol = stringFromCharCode(((codePoint >> 18) & 0x07) | 0xF0);
+			symbol += createByte(codePoint, 12);
+			symbol += createByte(codePoint, 6);
 		}
+		symbol += stringFromCharCode((codePoint & 0x3F) | 0x80);
+		return symbol;
 	}
 
-	throw Error('Invalid UTF-8 detected');
-}
+	function utf8encode(string, opts) {
+		opts = opts || {};
+		var strict = false !== opts.strict;
 
-var byteArray;
-var byteCount;
-var byteIndex;
-function utf8decode(byteString, opts) {
-	opts = opts || {};
-	var strict = false !== opts.strict;
-
-	byteArray = ucs2decode(byteString);
-	byteCount = byteArray.length;
-	byteIndex = 0;
-	var codePoints = [];
-	var tmp;
-	while ((tmp = decodeSymbol(strict)) !== false) {
-		codePoints.push(tmp);
+		var codePoints = ucs2decode(string);
+		var length = codePoints.length;
+		var index = -1;
+		var codePoint;
+		var byteString = '';
+		while (++index < length) {
+			codePoint = codePoints[index];
+			byteString += encodeCodePoint(codePoint, strict);
+		}
+		return byteString;
 	}
-	return ucs2encode(codePoints);
-}
 
-module.exports = {
-	version: '2.1.2',
-	encode: utf8encode,
-	decode: utf8decode
-};
+	/*--------------------------------------------------------------------------*/
 
-},{}],"../node_modules/base64-arraybuffer/lib/base64-arraybuffer.js":[function(require,module,exports) {
+	function readContinuationByte() {
+		if (byteIndex >= byteCount) {
+			throw Error('Invalid byte index');
+		}
+
+		var continuationByte = byteArray[byteIndex] & 0xFF;
+		byteIndex++;
+
+		if ((continuationByte & 0xC0) == 0x80) {
+			return continuationByte & 0x3F;
+		}
+
+		// If we end up here, it’s not a continuation byte
+		throw Error('Invalid continuation byte');
+	}
+
+	function decodeSymbol(strict) {
+		var byte1;
+		var byte2;
+		var byte3;
+		var byte4;
+		var codePoint;
+
+		if (byteIndex > byteCount) {
+			throw Error('Invalid byte index');
+		}
+
+		if (byteIndex == byteCount) {
+			return false;
+		}
+
+		// Read first byte
+		byte1 = byteArray[byteIndex] & 0xFF;
+		byteIndex++;
+
+		// 1-byte sequence (no continuation bytes)
+		if ((byte1 & 0x80) == 0) {
+			return byte1;
+		}
+
+		// 2-byte sequence
+		if ((byte1 & 0xE0) == 0xC0) {
+			byte2 = readContinuationByte();
+			codePoint = ((byte1 & 0x1F) << 6) | byte2;
+			if (codePoint >= 0x80) {
+				return codePoint;
+			} else {
+				throw Error('Invalid continuation byte');
+			}
+		}
+
+		// 3-byte sequence (may include unpaired surrogates)
+		if ((byte1 & 0xF0) == 0xE0) {
+			byte2 = readContinuationByte();
+			byte3 = readContinuationByte();
+			codePoint = ((byte1 & 0x0F) << 12) | (byte2 << 6) | byte3;
+			if (codePoint >= 0x0800) {
+				return checkScalarValue(codePoint, strict) ? codePoint : 0xFFFD;
+			} else {
+				throw Error('Invalid continuation byte');
+			}
+		}
+
+		// 4-byte sequence
+		if ((byte1 & 0xF8) == 0xF0) {
+			byte2 = readContinuationByte();
+			byte3 = readContinuationByte();
+			byte4 = readContinuationByte();
+			codePoint = ((byte1 & 0x07) << 0x12) | (byte2 << 0x0C) |
+				(byte3 << 0x06) | byte4;
+			if (codePoint >= 0x010000 && codePoint <= 0x10FFFF) {
+				return codePoint;
+			}
+		}
+
+		throw Error('Invalid UTF-8 detected');
+	}
+
+	var byteArray;
+	var byteCount;
+	var byteIndex;
+	function utf8decode(byteString, opts) {
+		opts = opts || {};
+		var strict = false !== opts.strict;
+
+		byteArray = ucs2decode(byteString);
+		byteCount = byteArray.length;
+		byteIndex = 0;
+		var codePoints = [];
+		var tmp;
+		while ((tmp = decodeSymbol(strict)) !== false) {
+			codePoints.push(tmp);
+		}
+		return ucs2encode(codePoints);
+	}
+
+	/*--------------------------------------------------------------------------*/
+
+	var utf8 = {
+		'version': '2.1.2',
+		'encode': utf8encode,
+		'decode': utf8decode
+	};
+
+	// Some AMD build optimizers, like r.js, check for specific condition patterns
+	// like the following:
+	if (
+		typeof define == 'function' &&
+		typeof define.amd == 'object' &&
+		define.amd
+	) {
+		define(function() {
+			return utf8;
+		});
+	}	else if (freeExports && !freeExports.nodeType) {
+		if (freeModule) { // in Node.js or RingoJS v0.8.0+
+			freeModule.exports = utf8;
+		} else { // in Narwhal or RingoJS v0.7.0-
+			var object = {};
+			var hasOwnProperty = object.hasOwnProperty;
+			for (var key in utf8) {
+				hasOwnProperty.call(utf8, key) && (freeExports[key] = utf8[key]);
+			}
+		}
+	} else { // in Rhino or a web browser
+		root.utf8 = utf8;
+	}
+
+}(this));
+
+},{}],"../node_modules/darklaunch-js/node_modules/base64-arraybuffer/lib/base64-arraybuffer.js":[function(require,module,exports) {
 /*
  * base64-arraybuffer
  * https://github.com/niklasvh/base64-arraybuffer
@@ -32956,16 +32662,16 @@ module.exports = {
     return arraybuffer;
   };
 })();
-},{}],"../node_modules/blob/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/blob/index.js":[function(require,module,exports) {
+var global = arguments[3];
 /**
  * Create a blob builder even when vendor prefixes exist
  */
 
-var BlobBuilder = typeof BlobBuilder !== 'undefined' ? BlobBuilder :
-  typeof WebKitBlobBuilder !== 'undefined' ? WebKitBlobBuilder :
-  typeof MSBlobBuilder !== 'undefined' ? MSBlobBuilder :
-  typeof MozBlobBuilder !== 'undefined' ? MozBlobBuilder : 
-  false;
+var BlobBuilder = global.BlobBuilder
+  || global.WebKitBlobBuilder
+  || global.MSBlobBuilder
+  || global.MozBlobBuilder;
 
 /**
  * Check if Blob constructor is supported
@@ -33009,7 +32715,8 @@ var blobBuilderSupported = BlobBuilder
  */
 
 function mapArrayBufferViews(ary) {
-  return ary.map(function(chunk) {
+  for (var i = 0; i < ary.length; i++) {
+    var chunk = ary[i];
     if (chunk.buffer instanceof ArrayBuffer) {
       var buf = chunk.buffer;
 
@@ -33021,36 +32728,32 @@ function mapArrayBufferViews(ary) {
         buf = copy.buffer;
       }
 
-      return buf;
+      ary[i] = buf;
     }
-
-    return chunk;
-  });
+  }
 }
 
 function BlobBuilderConstructor(ary, options) {
   options = options || {};
 
   var bb = new BlobBuilder();
-  mapArrayBufferViews(ary).forEach(function(part) {
-    bb.append(part);
-  });
+  mapArrayBufferViews(ary);
+
+  for (var i = 0; i < ary.length; i++) {
+    bb.append(ary[i]);
+  }
 
   return (options.type) ? bb.getBlob(options.type) : bb.getBlob();
 };
 
 function BlobConstructor(ary, options) {
-  return new Blob(mapArrayBufferViews(ary), options || {});
+  mapArrayBufferViews(ary);
+  return new Blob(ary, options || {});
 };
-
-if (typeof Blob !== 'undefined') {
-  BlobBuilderConstructor.prototype = Blob.prototype;
-  BlobConstructor.prototype = Blob.prototype;
-}
 
 module.exports = (function() {
   if (blobSupported) {
-    return blobSupportsArrayBufferView ? Blob : BlobConstructor;
+    return blobSupportsArrayBufferView ? global.Blob : BlobConstructor;
   } else if (blobBuilderSupported) {
     return BlobBuilderConstructor;
   } else {
@@ -33058,7 +32761,8 @@ module.exports = (function() {
   }
 })();
 
-},{}],"../node_modules/engine.io-parser/lib/browser.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/browser.js":[function(require,module,exports) {
+var global = arguments[3];
 /**
  * Module dependencies.
  */
@@ -33070,7 +32774,7 @@ var after = require('after');
 var utf8 = require('./utf8');
 
 var base64encoder;
-if (typeof ArrayBuffer !== 'undefined') {
+if (global && global.ArrayBuffer) {
   base64encoder = require('base64-arraybuffer');
 }
 
@@ -33162,9 +32866,9 @@ exports.encodePacket = function (packet, supportsBinary, utf8encode, callback) {
     ? undefined
     : packet.data.buffer || packet.data;
 
-  if (typeof ArrayBuffer !== 'undefined' && data instanceof ArrayBuffer) {
+  if (global.ArrayBuffer && data instanceof ArrayBuffer) {
     return encodeArrayBuffer(packet, supportsBinary, callback);
-  } else if (typeof Blob !== 'undefined' && data instanceof Blob) {
+  } else if (Blob && data instanceof global.Blob) {
     return encodeBlob(packet, supportsBinary, callback);
   }
 
@@ -33219,7 +32923,8 @@ function encodeBlobAsArrayBuffer(packet, supportsBinary, callback) {
 
   var fr = new FileReader();
   fr.onload = function() {
-    exports.encodePacket({ type: packet.type, data: fr.result }, supportsBinary, true, callback);
+    packet.data = fr.result;
+    exports.encodePacket(packet, supportsBinary, true, callback);
   };
   return fr.readAsArrayBuffer(packet.data);
 }
@@ -33249,7 +32954,7 @@ function encodeBlob(packet, supportsBinary, callback) {
 
 exports.encodeBase64Packet = function(packet, callback) {
   var message = 'b' + exports.packets[packet.type];
-  if (typeof Blob !== 'undefined' && packet.data instanceof Blob) {
+  if (Blob && packet.data instanceof global.Blob) {
     var fr = new FileReader();
     fr.onload = function() {
       var b64 = fr.result.split(',')[1];
@@ -33270,7 +32975,7 @@ exports.encodeBase64Packet = function(packet, callback) {
     }
     b64data = String.fromCharCode.apply(null, basic);
   }
-  message += btoa(b64data);
+  message += global.btoa(b64data);
   return callback(message);
 };
 
@@ -33665,7 +33370,7 @@ exports.decodePayloadAsBinary = function (data, binaryType, callback) {
   });
 };
 
-},{"./keys":"../node_modules/engine.io-parser/lib/keys.js","has-binary2":"../node_modules/has-binary2/index.js","arraybuffer.slice":"../node_modules/arraybuffer.slice/index.js","after":"../node_modules/after/index.js","./utf8":"../node_modules/engine.io-parser/lib/utf8.js","base64-arraybuffer":"../node_modules/base64-arraybuffer/lib/base64-arraybuffer.js","blob":"../node_modules/blob/index.js"}],"../node_modules/engine.io-client/lib/transport.js":[function(require,module,exports) {
+},{"./keys":"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/keys.js","has-binary2":"../node_modules/darklaunch-js/node_modules/has-binary2/index.js","arraybuffer.slice":"../node_modules/darklaunch-js/node_modules/arraybuffer.slice/index.js","after":"../node_modules/darklaunch-js/node_modules/after/index.js","./utf8":"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/utf8.js","base64-arraybuffer":"../node_modules/darklaunch-js/node_modules/base64-arraybuffer/lib/base64-arraybuffer.js","blob":"../node_modules/darklaunch-js/node_modules/blob/index.js"}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transport.js":[function(require,module,exports) {
 /**
  * Module dependencies.
  */
@@ -33708,9 +33413,6 @@ function Transport (opts) {
   this.ciphers = opts.ciphers;
   this.rejectUnauthorized = opts.rejectUnauthorized;
   this.forceNode = opts.forceNode;
-
-  // results of ReactNative environment detection
-  this.isReactNative = opts.isReactNative;
 
   // other options for Node.js client
   this.extraHeaders = opts.extraHeaders;
@@ -33827,7 +33529,7 @@ Transport.prototype.onClose = function () {
   this.emit('close');
 };
 
-},{"engine.io-parser":"../node_modules/engine.io-parser/lib/browser.js","component-emitter":"../node_modules/component-emitter/index.js"}],"../node_modules/parseqs/index.js":[function(require,module,exports) {
+},{"engine.io-parser":"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/browser.js","component-emitter":"../node_modules/darklaunch-js/node_modules/component-emitter/index.js"}],"../node_modules/darklaunch-js/node_modules/parseqs/index.js":[function(require,module,exports) {
 /**
  * Compiles a querystring
  * Returns string representation of the object
@@ -33866,7 +33568,7 @@ exports.decode = function(qs){
   return qry;
 };
 
-},{}],"../node_modules/component-inherit/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/component-inherit/index.js":[function(require,module,exports) {
 
 module.exports = function(a, b){
   var fn = function(){};
@@ -33874,7 +33576,7 @@ module.exports = function(a, b){
   a.prototype = new fn;
   a.prototype.constructor = a;
 };
-},{}],"../node_modules/yeast/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/yeast/index.js":[function(require,module,exports) {
 'use strict';
 
 var alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_'.split('')
@@ -33944,552 +33646,7 @@ yeast.encode = encode;
 yeast.decode = decode;
 module.exports = yeast;
 
-},{}],"../node_modules/engine.io-client/node_modules/ms/index.js":[function(require,module,exports) {
-/**
- * Helpers.
- */
-
-var s = 1000;
-var m = s * 60;
-var h = m * 60;
-var d = h * 24;
-var y = d * 365.25;
-
-/**
- * Parse or format the given `val`.
- *
- * Options:
- *
- *  - `long` verbose formatting [false]
- *
- * @param {String|Number} val
- * @param {Object} [options]
- * @throws {Error} throw an error if val is not a non-empty string or a number
- * @return {String|Number}
- * @api public
- */
-
-module.exports = function(val, options) {
-  options = options || {};
-  var type = typeof val;
-  if (type === 'string' && val.length > 0) {
-    return parse(val);
-  } else if (type === 'number' && isNaN(val) === false) {
-    return options.long ? fmtLong(val) : fmtShort(val);
-  }
-  throw new Error(
-    'val is not a non-empty string or a valid number. val=' +
-      JSON.stringify(val)
-  );
-};
-
-/**
- * Parse the given `str` and return milliseconds.
- *
- * @param {String} str
- * @return {Number}
- * @api private
- */
-
-function parse(str) {
-  str = String(str);
-  if (str.length > 100) {
-    return;
-  }
-  var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(
-    str
-  );
-  if (!match) {
-    return;
-  }
-  var n = parseFloat(match[1]);
-  var type = (match[2] || 'ms').toLowerCase();
-  switch (type) {
-    case 'years':
-    case 'year':
-    case 'yrs':
-    case 'yr':
-    case 'y':
-      return n * y;
-    case 'days':
-    case 'day':
-    case 'd':
-      return n * d;
-    case 'hours':
-    case 'hour':
-    case 'hrs':
-    case 'hr':
-    case 'h':
-      return n * h;
-    case 'minutes':
-    case 'minute':
-    case 'mins':
-    case 'min':
-    case 'm':
-      return n * m;
-    case 'seconds':
-    case 'second':
-    case 'secs':
-    case 'sec':
-    case 's':
-      return n * s;
-    case 'milliseconds':
-    case 'millisecond':
-    case 'msecs':
-    case 'msec':
-    case 'ms':
-      return n;
-    default:
-      return undefined;
-  }
-}
-
-/**
- * Short format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtShort(ms) {
-  if (ms >= d) {
-    return Math.round(ms / d) + 'd';
-  }
-  if (ms >= h) {
-    return Math.round(ms / h) + 'h';
-  }
-  if (ms >= m) {
-    return Math.round(ms / m) + 'm';
-  }
-  if (ms >= s) {
-    return Math.round(ms / s) + 's';
-  }
-  return ms + 'ms';
-}
-
-/**
- * Long format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtLong(ms) {
-  return plural(ms, d, 'day') ||
-    plural(ms, h, 'hour') ||
-    plural(ms, m, 'minute') ||
-    plural(ms, s, 'second') ||
-    ms + ' ms';
-}
-
-/**
- * Pluralization helper.
- */
-
-function plural(ms, n, name) {
-  if (ms < n) {
-    return;
-  }
-  if (ms < n * 1.5) {
-    return Math.floor(ms / n) + ' ' + name;
-  }
-  return Math.ceil(ms / n) + ' ' + name + 's';
-}
-
-},{}],"../node_modules/engine.io-client/node_modules/debug/src/debug.js":[function(require,module,exports) {
-
-/**
- * This is the common logic for both the Node.js and web browser
- * implementations of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-
-exports = module.exports = createDebug.debug = createDebug['default'] = createDebug;
-exports.coerce = coerce;
-exports.disable = disable;
-exports.enable = enable;
-exports.enabled = enabled;
-exports.humanize = require('ms');
-
-/**
- * Active `debug` instances.
- */
-exports.instances = [];
-
-/**
- * The currently active debug mode names, and names to skip.
- */
-
-exports.names = [];
-exports.skips = [];
-
-/**
- * Map of special "%n" handling functions, for the debug "format" argument.
- *
- * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
- */
-
-exports.formatters = {};
-
-/**
- * Select a color.
- * @param {String} namespace
- * @return {Number}
- * @api private
- */
-
-function selectColor(namespace) {
-  var hash = 0, i;
-
-  for (i in namespace) {
-    hash  = ((hash << 5) - hash) + namespace.charCodeAt(i);
-    hash |= 0; // Convert to 32bit integer
-  }
-
-  return exports.colors[Math.abs(hash) % exports.colors.length];
-}
-
-/**
- * Create a debugger with the given `namespace`.
- *
- * @param {String} namespace
- * @return {Function}
- * @api public
- */
-
-function createDebug(namespace) {
-
-  var prevTime;
-
-  function debug() {
-    // disabled?
-    if (!debug.enabled) return;
-
-    var self = debug;
-
-    // set `diff` timestamp
-    var curr = +new Date();
-    var ms = curr - (prevTime || curr);
-    self.diff = ms;
-    self.prev = prevTime;
-    self.curr = curr;
-    prevTime = curr;
-
-    // turn the `arguments` into a proper Array
-    var args = new Array(arguments.length);
-    for (var i = 0; i < args.length; i++) {
-      args[i] = arguments[i];
-    }
-
-    args[0] = exports.coerce(args[0]);
-
-    if ('string' !== typeof args[0]) {
-      // anything else let's inspect with %O
-      args.unshift('%O');
-    }
-
-    // apply any `formatters` transformations
-    var index = 0;
-    args[0] = args[0].replace(/%([a-zA-Z%])/g, function(match, format) {
-      // if we encounter an escaped % then don't increase the array index
-      if (match === '%%') return match;
-      index++;
-      var formatter = exports.formatters[format];
-      if ('function' === typeof formatter) {
-        var val = args[index];
-        match = formatter.call(self, val);
-
-        // now we need to remove `args[index]` since it's inlined in the `format`
-        args.splice(index, 1);
-        index--;
-      }
-      return match;
-    });
-
-    // apply env-specific formatting (colors, etc.)
-    exports.formatArgs.call(self, args);
-
-    var logFn = debug.log || exports.log || console.log.bind(console);
-    logFn.apply(self, args);
-  }
-
-  debug.namespace = namespace;
-  debug.enabled = exports.enabled(namespace);
-  debug.useColors = exports.useColors();
-  debug.color = selectColor(namespace);
-  debug.destroy = destroy;
-
-  // env-specific initialization logic for debug instances
-  if ('function' === typeof exports.init) {
-    exports.init(debug);
-  }
-
-  exports.instances.push(debug);
-
-  return debug;
-}
-
-function destroy () {
-  var index = exports.instances.indexOf(this);
-  if (index !== -1) {
-    exports.instances.splice(index, 1);
-    return true;
-  } else {
-    return false;
-  }
-}
-
-/**
- * Enables a debug mode by namespaces. This can include modes
- * separated by a colon and wildcards.
- *
- * @param {String} namespaces
- * @api public
- */
-
-function enable(namespaces) {
-  exports.save(namespaces);
-
-  exports.names = [];
-  exports.skips = [];
-
-  var i;
-  var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
-  var len = split.length;
-
-  for (i = 0; i < len; i++) {
-    if (!split[i]) continue; // ignore empty strings
-    namespaces = split[i].replace(/\*/g, '.*?');
-    if (namespaces[0] === '-') {
-      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
-    } else {
-      exports.names.push(new RegExp('^' + namespaces + '$'));
-    }
-  }
-
-  for (i = 0; i < exports.instances.length; i++) {
-    var instance = exports.instances[i];
-    instance.enabled = exports.enabled(instance.namespace);
-  }
-}
-
-/**
- * Disable debug output.
- *
- * @api public
- */
-
-function disable() {
-  exports.enable('');
-}
-
-/**
- * Returns true if the given mode name is enabled, false otherwise.
- *
- * @param {String} name
- * @return {Boolean}
- * @api public
- */
-
-function enabled(name) {
-  if (name[name.length - 1] === '*') {
-    return true;
-  }
-  var i, len;
-  for (i = 0, len = exports.skips.length; i < len; i++) {
-    if (exports.skips[i].test(name)) {
-      return false;
-    }
-  }
-  for (i = 0, len = exports.names.length; i < len; i++) {
-    if (exports.names[i].test(name)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Coerce `val`.
- *
- * @param {Mixed} val
- * @return {Mixed}
- * @api private
- */
-
-function coerce(val) {
-  if (val instanceof Error) return val.stack || val.message;
-  return val;
-}
-
-},{"ms":"../node_modules/engine.io-client/node_modules/ms/index.js"}],"../node_modules/engine.io-client/node_modules/debug/src/browser.js":[function(require,module,exports) {
-var process = require("process");
-/**
- * This is the web browser implementation of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-exports = module.exports = require('./debug');
-exports.log = log;
-exports.formatArgs = formatArgs;
-exports.save = save;
-exports.load = load;
-exports.useColors = useColors;
-exports.storage = 'undefined' != typeof chrome && 'undefined' != typeof chrome.storage ? chrome.storage.local : localstorage();
-/**
- * Colors.
- */
-
-exports.colors = ['#0000CC', '#0000FF', '#0033CC', '#0033FF', '#0066CC', '#0066FF', '#0099CC', '#0099FF', '#00CC00', '#00CC33', '#00CC66', '#00CC99', '#00CCCC', '#00CCFF', '#3300CC', '#3300FF', '#3333CC', '#3333FF', '#3366CC', '#3366FF', '#3399CC', '#3399FF', '#33CC00', '#33CC33', '#33CC66', '#33CC99', '#33CCCC', '#33CCFF', '#6600CC', '#6600FF', '#6633CC', '#6633FF', '#66CC00', '#66CC33', '#9900CC', '#9900FF', '#9933CC', '#9933FF', '#99CC00', '#99CC33', '#CC0000', '#CC0033', '#CC0066', '#CC0099', '#CC00CC', '#CC00FF', '#CC3300', '#CC3333', '#CC3366', '#CC3399', '#CC33CC', '#CC33FF', '#CC6600', '#CC6633', '#CC9900', '#CC9933', '#CCCC00', '#CCCC33', '#FF0000', '#FF0033', '#FF0066', '#FF0099', '#FF00CC', '#FF00FF', '#FF3300', '#FF3333', '#FF3366', '#FF3399', '#FF33CC', '#FF33FF', '#FF6600', '#FF6633', '#FF9900', '#FF9933', '#FFCC00', '#FFCC33'];
-/**
- * Currently only WebKit-based Web Inspectors, Firefox >= v31,
- * and the Firebug extension (any Firefox version) are known
- * to support "%c" CSS customizations.
- *
- * TODO: add a `localStorage` variable to explicitly enable/disable colors
- */
-
-function useColors() {
-  // NB: In an Electron preload script, document will be defined but not fully
-  // initialized. Since we know we're in Chrome, we'll just detect this case
-  // explicitly
-  if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
-    return true;
-  } // Internet Explorer and Edge do not support colors.
-
-
-  if (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
-    return false;
-  } // is webkit? http://stackoverflow.com/a/16459606/376773
-  // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
-
-
-  return typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // is firebug? http://stackoverflow.com/a/398120/376773
-  typeof window !== 'undefined' && window.console && (window.console.firebug || window.console.exception && window.console.table) || // is firefox >= v31?
-  // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-  typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 || // double check webkit in userAgent just in case we are in a worker
-  typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
-}
-/**
- * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
- */
-
-
-exports.formatters.j = function (v) {
-  try {
-    return JSON.stringify(v);
-  } catch (err) {
-    return '[UnexpectedJSONParseError]: ' + err.message;
-  }
-};
-/**
- * Colorize log arguments if enabled.
- *
- * @api public
- */
-
-
-function formatArgs(args) {
-  var useColors = this.useColors;
-  args[0] = (useColors ? '%c' : '') + this.namespace + (useColors ? ' %c' : ' ') + args[0] + (useColors ? '%c ' : ' ') + '+' + exports.humanize(this.diff);
-  if (!useColors) return;
-  var c = 'color: ' + this.color;
-  args.splice(1, 0, c, 'color: inherit'); // the final "%c" is somewhat tricky, because there could be other
-  // arguments passed either before or after the %c, so we need to
-  // figure out the correct index to insert the CSS into
-
-  var index = 0;
-  var lastC = 0;
-  args[0].replace(/%[a-zA-Z%]/g, function (match) {
-    if ('%%' === match) return;
-    index++;
-
-    if ('%c' === match) {
-      // we only are interested in the *last* %c
-      // (the user may have provided their own)
-      lastC = index;
-    }
-  });
-  args.splice(lastC, 0, c);
-}
-/**
- * Invokes `console.log()` when available.
- * No-op when `console.log` is not a "function".
- *
- * @api public
- */
-
-
-function log() {
-  // this hackery is required for IE8/9, where
-  // the `console.log` function doesn't have 'apply'
-  return 'object' === typeof console && console.log && Function.prototype.apply.call(console.log, console, arguments);
-}
-/**
- * Save `namespaces`.
- *
- * @param {String} namespaces
- * @api private
- */
-
-
-function save(namespaces) {
-  try {
-    if (null == namespaces) {
-      exports.storage.removeItem('debug');
-    } else {
-      exports.storage.debug = namespaces;
-    }
-  } catch (e) {}
-}
-/**
- * Load `namespaces`.
- *
- * @return {String} returns the previously persisted debug modes
- * @api private
- */
-
-
-function load() {
-  var r;
-
-  try {
-    r = exports.storage.debug;
-  } catch (e) {} // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
-
-
-  if (!r && typeof process !== 'undefined' && 'env' in process) {
-    r = undefined;
-  }
-
-  return r;
-}
-/**
- * Enable namespaces listed in `localStorage.debug` initially.
- */
-
-
-exports.enable(load());
-/**
- * Localstorage attempts to return the localstorage.
- *
- * This is necessary because safari throws
- * when a user disables cookies/localstorage
- * and you attempt to access it.
- *
- * @return {LocalStorage}
- * @api private
- */
-
-function localstorage() {
-  try {
-    return window.localStorage;
-  } catch (e) {}
-}
-},{"./debug":"../node_modules/engine.io-client/node_modules/debug/src/debug.js","process":"../node_modules/process/browser.js"}],"../node_modules/engine.io-client/lib/transports/polling.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/polling.js":[function(require,module,exports) {
 /**
  * Module dependencies.
  */
@@ -34736,9 +33893,8 @@ Polling.prototype.uri = function () {
   return schema + '://' + (ipv6 ? '[' + this.hostname + ']' : this.hostname) + port + this.path + query;
 };
 
-},{"../transport":"../node_modules/engine.io-client/lib/transport.js","parseqs":"../node_modules/parseqs/index.js","engine.io-parser":"../node_modules/engine.io-parser/lib/browser.js","component-inherit":"../node_modules/component-inherit/index.js","yeast":"../node_modules/yeast/index.js","debug":"../node_modules/engine.io-client/node_modules/debug/src/browser.js","xmlhttprequest-ssl":"../node_modules/engine.io-client/lib/xmlhttprequest.js"}],"../node_modules/engine.io-client/lib/transports/polling-xhr.js":[function(require,module,exports) {
-/* global attachEvent */
-
+},{"../transport":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transport.js","parseqs":"../node_modules/darklaunch-js/node_modules/parseqs/index.js","engine.io-parser":"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/browser.js","component-inherit":"../node_modules/darklaunch-js/node_modules/component-inherit/index.js","yeast":"../node_modules/darklaunch-js/node_modules/yeast/index.js","debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js","xmlhttprequest-ssl":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/xmlhttprequest.js"}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/polling-xhr.js":[function(require,module,exports) {
+var global = arguments[3];
 /**
  * Module requirements.
  */
@@ -34774,7 +33930,7 @@ function XHR (opts) {
   this.requestTimeout = opts.requestTimeout;
   this.extraHeaders = opts.extraHeaders;
 
-  if (typeof location !== 'undefined') {
+  if (global.location) {
     var isSSL = 'https:' === location.protocol;
     var port = location.port;
 
@@ -34783,7 +33939,7 @@ function XHR (opts) {
       port = isSSL ? 443 : 80;
     }
 
-    this.xd = (typeof location !== 'undefined' && opts.hostname !== location.hostname) ||
+    this.xd = opts.hostname !== global.location.hostname ||
       port !== opts.port;
     this.xs = opts.secure !== isSSL;
   }
@@ -35012,7 +34168,7 @@ Request.prototype.create = function () {
     return;
   }
 
-  if (typeof document !== 'undefined') {
+  if (global.document) {
     this.index = Request.requestsCount++;
     Request.requests[this.index] = this;
   }
@@ -35074,7 +34230,7 @@ Request.prototype.cleanup = function (fromError) {
     } catch (e) {}
   }
 
-  if (typeof document !== 'undefined') {
+  if (global.document) {
     delete Request.requests[this.index];
   }
 
@@ -35114,7 +34270,7 @@ Request.prototype.onLoad = function () {
  */
 
 Request.prototype.hasXDR = function () {
-  return typeof XDomainRequest !== 'undefined' && !this.xs && this.enablesXDR;
+  return 'undefined' !== typeof global.XDomainRequest && !this.xs && this.enablesXDR;
 };
 
 /**
@@ -35136,12 +34292,11 @@ Request.prototype.abort = function () {
 Request.requestsCount = 0;
 Request.requests = {};
 
-if (typeof document !== 'undefined') {
-  if (typeof attachEvent === 'function') {
-    attachEvent('onunload', unloadHandler);
-  } else if (typeof addEventListener === 'function') {
-    var terminationEvent = 'onpagehide' in self ? 'pagehide' : 'unload';
-    addEventListener(terminationEvent, unloadHandler, false);
+if (global.document) {
+  if (global.attachEvent) {
+    global.attachEvent('onunload', unloadHandler);
+  } else if (global.addEventListener) {
+    global.addEventListener('beforeunload', unloadHandler, false);
   }
 }
 
@@ -35153,8 +34308,9 @@ function unloadHandler () {
   }
 }
 
-},{"xmlhttprequest-ssl":"../node_modules/engine.io-client/lib/xmlhttprequest.js","./polling":"../node_modules/engine.io-client/lib/transports/polling.js","component-emitter":"../node_modules/component-emitter/index.js","component-inherit":"../node_modules/component-inherit/index.js","debug":"../node_modules/engine.io-client/node_modules/debug/src/browser.js"}],"../node_modules/engine.io-client/lib/transports/polling-jsonp.js":[function(require,module,exports) {
+},{"xmlhttprequest-ssl":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/xmlhttprequest.js","./polling":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/polling.js","component-emitter":"../node_modules/darklaunch-js/node_modules/component-emitter/index.js","component-inherit":"../node_modules/darklaunch-js/node_modules/component-inherit/index.js","debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js"}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/polling-jsonp.js":[function(require,module,exports) {
 var global = arguments[3];
+
 /**
  * Module requirements.
  */
@@ -35188,15 +34344,6 @@ var callbacks;
 function empty () { }
 
 /**
- * Until https://github.com/tc39/proposal-global is shipped.
- */
-function glob () {
-  return typeof self !== 'undefined' ? self
-      : typeof window !== 'undefined' ? window
-      : typeof global !== 'undefined' ? global : {};
-}
-
-/**
  * JSONP Polling constructor.
  *
  * @param {Object} opts.
@@ -35212,8 +34359,8 @@ function JSONPPolling (opts) {
   // we do this here (lazily) to avoid unneeded global pollution
   if (!callbacks) {
     // we need to consider multiple engines in the same page
-    var global = glob();
-    callbacks = global.___eio = (global.___eio || []);
+    if (!global.___eio) global.___eio = [];
+    callbacks = global.___eio;
   }
 
   // callback identifier
@@ -35229,8 +34376,8 @@ function JSONPPolling (opts) {
   this.query.j = this.index;
 
   // prevent spurious errors from being emitted when the window is unloaded
-  if (typeof addEventListener === 'function') {
-    addEventListener('beforeunload', function () {
+  if (global.document && global.addEventListener) {
+    global.addEventListener('beforeunload', function () {
       if (self.script) self.script.onerror = empty;
     }, false);
   }
@@ -35395,10 +34542,10 @@ JSONPPolling.prototype.doWrite = function (data, fn) {
   }
 };
 
-},{"./polling":"../node_modules/engine.io-client/lib/transports/polling.js","component-inherit":"../node_modules/component-inherit/index.js"}],"../node_modules/parcel-bundler/src/builtins/_empty.js":[function(require,module,exports) {
+},{"./polling":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/polling.js","component-inherit":"../node_modules/darklaunch-js/node_modules/component-inherit/index.js"}],"../node_modules/parcel-bundler/src/builtins/_empty.js":[function(require,module,exports) {
 
-},{}],"../node_modules/engine.io-client/lib/transports/websocket.js":[function(require,module,exports) {
-var Buffer = require("buffer").Buffer;
+},{}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/websocket.js":[function(require,module,exports) {
+var global = arguments[3];
 /**
  * Module dependencies.
  */
@@ -35409,14 +34556,9 @@ var parseqs = require('parseqs');
 var inherit = require('component-inherit');
 var yeast = require('yeast');
 var debug = require('debug')('engine.io-client:websocket');
-
-var BrowserWebSocket, NodeWebSocket;
-
-if (typeof WebSocket !== 'undefined') {
-  BrowserWebSocket = WebSocket;
-} else if (typeof self !== 'undefined') {
-  BrowserWebSocket = self.WebSocket || self.MozWebSocket;
-} else {
+var BrowserWebSocket = global.WebSocket || global.MozWebSocket;
+var NodeWebSocket;
+if (typeof window === 'undefined') {
   try {
     NodeWebSocket = require('ws');
   } catch (e) { }
@@ -35428,7 +34570,10 @@ if (typeof WebSocket !== 'undefined') {
  * interface exposed by `ws` for Node-like environment.
  */
 
-var WebSocketImpl = BrowserWebSocket || NodeWebSocket;
+var WebSocket = BrowserWebSocket;
+if (!WebSocket && typeof window === 'undefined') {
+  WebSocket = NodeWebSocket;
+}
 
 /**
  * Module exports.
@@ -35452,7 +34597,7 @@ function WS (opts) {
   this.usingBrowserWebSocket = BrowserWebSocket && !opts.forceNode;
   this.protocols = opts.protocols;
   if (!this.usingBrowserWebSocket) {
-    WebSocketImpl = NodeWebSocket;
+    WebSocket = NodeWebSocket;
   }
   Transport.call(this, opts);
 }
@@ -35512,12 +34657,7 @@ WS.prototype.doOpen = function () {
   }
 
   try {
-    this.ws =
-      this.usingBrowserWebSocket && !this.isReactNative
-        ? protocols
-          ? new WebSocketImpl(uri, protocols)
-          : new WebSocketImpl(uri)
-        : new WebSocketImpl(uri, protocols, opts);
+    this.ws = this.usingBrowserWebSocket ? (protocols ? new WebSocket(uri, protocols) : new WebSocket(uri)) : new WebSocket(uri, protocols, opts);
   } catch (err) {
     return this.emit('error', err);
   }
@@ -35584,7 +34724,7 @@ WS.prototype.write = function (packets) {
           }
 
           if (self.perMessageDeflate) {
-            var len = 'string' === typeof data ? Buffer.byteLength(data) : data.length;
+            var len = 'string' === typeof data ? global.Buffer.byteLength(data) : data.length;
             if (len < self.perMessageDeflate.threshold) {
               opts.compress = false;
             }
@@ -35690,10 +34830,11 @@ WS.prototype.uri = function () {
  */
 
 WS.prototype.check = function () {
-  return !!WebSocketImpl && !('__initialize' in WebSocketImpl && this.name === WS.prototype.name);
+  return !!WebSocket && !('__initialize' in WebSocket && this.name === WS.prototype.name);
 };
 
-},{"../transport":"../node_modules/engine.io-client/lib/transport.js","engine.io-parser":"../node_modules/engine.io-parser/lib/browser.js","parseqs":"../node_modules/parseqs/index.js","component-inherit":"../node_modules/component-inherit/index.js","yeast":"../node_modules/yeast/index.js","debug":"../node_modules/engine.io-client/node_modules/debug/src/browser.js","ws":"../node_modules/parcel-bundler/src/builtins/_empty.js","buffer":"../node_modules/buffer/index.js"}],"../node_modules/engine.io-client/lib/transports/index.js":[function(require,module,exports) {
+},{"../transport":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transport.js","engine.io-parser":"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/browser.js","parseqs":"../node_modules/darklaunch-js/node_modules/parseqs/index.js","component-inherit":"../node_modules/darklaunch-js/node_modules/component-inherit/index.js","yeast":"../node_modules/darklaunch-js/node_modules/yeast/index.js","debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js","ws":"../node_modules/parcel-bundler/src/builtins/_empty.js"}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/index.js":[function(require,module,exports) {
+var global = arguments[3];
 /**
  * Module dependencies
  */
@@ -35723,7 +34864,7 @@ function polling (opts) {
   var xs = false;
   var jsonp = false !== opts.jsonp;
 
-  if (typeof location !== 'undefined') {
+  if (global.location) {
     var isSSL = 'https:' === location.protocol;
     var port = location.port;
 
@@ -35748,7 +34889,7 @@ function polling (opts) {
   }
 }
 
-},{"xmlhttprequest-ssl":"../node_modules/engine.io-client/lib/xmlhttprequest.js","./polling-xhr":"../node_modules/engine.io-client/lib/transports/polling-xhr.js","./polling-jsonp":"../node_modules/engine.io-client/lib/transports/polling-jsonp.js","./websocket":"../node_modules/engine.io-client/lib/transports/websocket.js"}],"../node_modules/indexof/index.js":[function(require,module,exports) {
+},{"xmlhttprequest-ssl":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/xmlhttprequest.js","./polling-xhr":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/polling-xhr.js","./polling-jsonp":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/polling-jsonp.js","./websocket":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/websocket.js"}],"../node_modules/darklaunch-js/node_modules/indexof/index.js":[function(require,module,exports) {
 
 var indexOf = [].indexOf;
 
@@ -35759,7 +34900,8 @@ module.exports = function(arr, obj){
   }
   return -1;
 };
-},{}],"../node_modules/engine.io-client/lib/socket.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/socket.js":[function(require,module,exports) {
+var global = arguments[3];
 /**
  * Module dependencies.
  */
@@ -35807,7 +34949,7 @@ function Socket (uri, opts) {
   }
 
   this.secure = null != opts.secure ? opts.secure
-    : (typeof location !== 'undefined' && 'https:' === location.protocol);
+    : (global.location && 'https:' === location.protocol);
 
   if (opts.hostname && !opts.port) {
     // if no port is specified manually, use the protocol default
@@ -35816,8 +34958,8 @@ function Socket (uri, opts) {
 
   this.agent = opts.agent || false;
   this.hostname = opts.hostname ||
-    (typeof location !== 'undefined' ? location.hostname : 'localhost');
-  this.port = opts.port || (typeof location !== 'undefined' && location.port
+    (global.location ? location.hostname : 'localhost');
+  this.port = opts.port || (global.location && location.port
       ? location.port
       : (this.secure ? 443 : 80));
   this.query = opts.query || {};
@@ -35856,11 +34998,9 @@ function Socket (uri, opts) {
   this.rejectUnauthorized = opts.rejectUnauthorized === undefined ? true : opts.rejectUnauthorized;
   this.forceNode = !!opts.forceNode;
 
-  // detect ReactNative environment
-  this.isReactNative = (typeof navigator !== 'undefined' && typeof navigator.product === 'string' && navigator.product.toLowerCase() === 'reactnative');
-
-  // other options for Node.js or ReactNative client
-  if (typeof self === 'undefined' || this.isReactNative) {
+  // other options for Node.js client
+  var freeGlobal = typeof global === 'object' && global;
+  if (freeGlobal.global === freeGlobal) {
     if (opts.extraHeaders && Object.keys(opts.extraHeaders).length > 0) {
       this.extraHeaders = opts.extraHeaders;
     }
@@ -35960,8 +35100,7 @@ Socket.prototype.createTransport = function (name) {
     forceNode: options.forceNode || this.forceNode,
     localAddress: options.localAddress || this.localAddress,
     requestTimeout: options.requestTimeout || this.requestTimeout,
-    protocols: options.protocols || void (0),
-    isReactNative: this.isReactNative
+    protocols: options.protocols || void (0)
   });
 
   return transport;
@@ -36507,7 +35646,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
   return filteredUpgrades;
 };
 
-},{"./transports/index":"../node_modules/engine.io-client/lib/transports/index.js","component-emitter":"../node_modules/component-emitter/index.js","debug":"../node_modules/engine.io-client/node_modules/debug/src/browser.js","indexof":"../node_modules/indexof/index.js","engine.io-parser":"../node_modules/engine.io-parser/lib/browser.js","parseuri":"../node_modules/parseuri/index.js","parseqs":"../node_modules/parseqs/index.js","./transport":"../node_modules/engine.io-client/lib/transport.js"}],"../node_modules/engine.io-client/lib/index.js":[function(require,module,exports) {
+},{"./transports/index":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transports/index.js","component-emitter":"../node_modules/darklaunch-js/node_modules/component-emitter/index.js","debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js","indexof":"../node_modules/darklaunch-js/node_modules/indexof/index.js","engine.io-parser":"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/browser.js","parseuri":"../node_modules/darklaunch-js/node_modules/parseuri/index.js","parseqs":"../node_modules/darklaunch-js/node_modules/parseqs/index.js","./transport":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/transport.js"}],"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/index.js":[function(require,module,exports) {
 
 module.exports = require('./socket');
 
@@ -36519,7 +35658,7 @@ module.exports = require('./socket');
  */
 module.exports.parser = require('engine.io-parser');
 
-},{"./socket":"../node_modules/engine.io-client/lib/socket.js","engine.io-parser":"../node_modules/engine.io-parser/lib/browser.js"}],"../node_modules/to-array/index.js":[function(require,module,exports) {
+},{"./socket":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/socket.js","engine.io-parser":"../node_modules/darklaunch-js/node_modules/engine.io-parser/lib/browser.js"}],"../node_modules/darklaunch-js/node_modules/to-array/index.js":[function(require,module,exports) {
 module.exports = toArray
 
 function toArray(list, index) {
@@ -36534,7 +35673,7 @@ function toArray(list, index) {
     return array
 }
 
-},{}],"../node_modules/socket.io-client/lib/on.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/on.js":[function(require,module,exports) {
 
 /**
  * Module exports.
@@ -36560,7 +35699,7 @@ function on (obj, ev, fn) {
   };
 }
 
-},{}],"../node_modules/component-bind/index.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/component-bind/index.js":[function(require,module,exports) {
 /**
  * Slice reference.
  */
@@ -36585,7 +35724,7 @@ module.exports = function(obj, fn){
   }
 };
 
-},{}],"../node_modules/socket.io-client/lib/socket.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/socket.js":[function(require,module,exports) {
 
 /**
  * Module dependencies.
@@ -37025,7 +36164,7 @@ Socket.prototype.binary = function (binary) {
   return this;
 };
 
-},{"socket.io-parser":"../node_modules/socket.io-parser/index.js","component-emitter":"../node_modules/component-emitter/index.js","to-array":"../node_modules/to-array/index.js","./on":"../node_modules/socket.io-client/lib/on.js","component-bind":"../node_modules/component-bind/index.js","debug":"../node_modules/socket.io-client/node_modules/debug/src/browser.js","parseqs":"../node_modules/parseqs/index.js","has-binary2":"../node_modules/has-binary2/index.js"}],"../node_modules/backo2/index.js":[function(require,module,exports) {
+},{"socket.io-parser":"../node_modules/darklaunch-js/node_modules/socket.io-parser/index.js","component-emitter":"../node_modules/darklaunch-js/node_modules/component-emitter/index.js","to-array":"../node_modules/darklaunch-js/node_modules/to-array/index.js","./on":"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/on.js","component-bind":"../node_modules/darklaunch-js/node_modules/component-bind/index.js","debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js","parseqs":"../node_modules/darklaunch-js/node_modules/parseqs/index.js","has-binary2":"../node_modules/darklaunch-js/node_modules/has-binary2/index.js"}],"../node_modules/darklaunch-js/node_modules/backo2/index.js":[function(require,module,exports) {
 
 /**
  * Expose `Backoff`.
@@ -37112,7 +36251,7 @@ Backoff.prototype.setJitter = function(jitter){
 };
 
 
-},{}],"../node_modules/socket.io-client/lib/manager.js":[function(require,module,exports) {
+},{}],"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/manager.js":[function(require,module,exports) {
 
 /**
  * Module dependencies.
@@ -37687,7 +36826,7 @@ Manager.prototype.onreconnect = function () {
   this.emitAll('reconnect', attempt);
 };
 
-},{"engine.io-client":"../node_modules/engine.io-client/lib/index.js","./socket":"../node_modules/socket.io-client/lib/socket.js","component-emitter":"../node_modules/component-emitter/index.js","socket.io-parser":"../node_modules/socket.io-parser/index.js","./on":"../node_modules/socket.io-client/lib/on.js","component-bind":"../node_modules/component-bind/index.js","debug":"../node_modules/socket.io-client/node_modules/debug/src/browser.js","indexof":"../node_modules/indexof/index.js","backo2":"../node_modules/backo2/index.js"}],"../node_modules/socket.io-client/lib/index.js":[function(require,module,exports) {
+},{"engine.io-client":"../node_modules/darklaunch-js/node_modules/engine.io-client/lib/index.js","./socket":"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/socket.js","component-emitter":"../node_modules/darklaunch-js/node_modules/component-emitter/index.js","socket.io-parser":"../node_modules/darklaunch-js/node_modules/socket.io-parser/index.js","./on":"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/on.js","component-bind":"../node_modules/darklaunch-js/node_modules/component-bind/index.js","debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js","indexof":"../node_modules/darklaunch-js/node_modules/indexof/index.js","backo2":"../node_modules/darklaunch-js/node_modules/backo2/index.js"}],"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/index.js":[function(require,module,exports) {
 
 /**
  * Module dependencies.
@@ -37783,7 +36922,7 @@ exports.connect = lookup;
 exports.Manager = require('./manager');
 exports.Socket = require('./socket');
 
-},{"./url":"../node_modules/socket.io-client/lib/url.js","socket.io-parser":"../node_modules/socket.io-parser/index.js","./manager":"../node_modules/socket.io-client/lib/manager.js","debug":"../node_modules/socket.io-client/node_modules/debug/src/browser.js","./socket":"../node_modules/socket.io-client/lib/socket.js"}],"../node_modules/mobx/lib/mobx.module.js":[function(require,module,exports) {
+},{"./url":"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/url.js","socket.io-parser":"../node_modules/darklaunch-js/node_modules/socket.io-parser/index.js","./manager":"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/manager.js","debug":"../node_modules/darklaunch-js/node_modules/debug/src/browser.js","./socket":"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/socket.js"}],"../node_modules/darklaunch-js/node_modules/mobx/lib/mobx.module.js":[function(require,module,exports) {
 var process = require("process");
 var global = arguments[3];
 "use strict";
@@ -37836,7 +36975,7 @@ exports.isArrayLike = isArrayLike$$1;
 exports._isComputingDerivation = isComputingDerivation$$1;
 exports.onReactionError = onReactionError$$1;
 exports._interceptReads = interceptReads$$1;
-exports.$mobx = exports.action = exports.computed = exports.observable = exports.isObservableSet = exports.ObservableSet = exports.isObservableMap = exports.ObservableMap = exports.isBoxedObservable = exports.comparer = exports.IDerivationState = exports.Reaction = void 0;
+exports.$mobx = exports.action = exports.computed = exports.observable = exports.isObservableMap = exports.ObservableMap = exports.isBoxedObservable = exports.comparer = exports.IDerivationState = exports.Reaction = void 0;
 
 /** MobX - (c) Michel Weststrate 2015 - 2018 - MIT Licensed */
 
@@ -38047,10 +37186,6 @@ function isArrayLike$$1(x) {
 
 function isES6Map$$1(thing) {
   return thing instanceof Map;
-}
-
-function isES6Set$$1(thing) {
-  return thing instanceof Set;
 }
 
 function getMapLikeKeys$$1(map) {
@@ -38271,15 +37406,12 @@ function deepEnhancer$$1(v, _, name) {
   if (isES6Map$$1(v)) return observable$$1.map(v, {
     name: name
   });
-  if (isES6Set$$1(v)) return observable$$1.set(v, {
-    name: name
-  });
   return v;
 }
 
 function shallowEnhancer$$1(v, _, name) {
   if (v === undefined || v === null) return v;
-  if (isObservableObject$$1(v) || isObservableArray$$1(v) || isObservableMap$$1(v) || isObservableSet$$1(v)) return v;
+  if (isObservableObject$$1(v) || isObservableArray$$1(v) || isObservableMap$$1(v)) return v;
   if (Array.isArray(v)) return observable$$1.array(v, {
     name: name,
     deep: false
@@ -38292,11 +37424,7 @@ function shallowEnhancer$$1(v, _, name) {
     name: name,
     deep: false
   });
-  if (isES6Set$$1(v)) return observable$$1.set(v, {
-    name: name,
-    deep: false
-  });
-  return fail$$1("development" !== "production" && "The shallow modifier / decorator can only used in combination with arrays, objects, maps and sets");
+  return fail$$1("development" !== "production" && "The shallow modifier / decorator can only used in combination with arrays, objects and maps");
 }
 
 function referenceEnhancer$$1(newValue) {
@@ -38342,7 +37470,7 @@ var defaultCreateObservableOptions$$1 = {
 Object.freeze(defaultCreateObservableOptions$$1);
 
 function assertValidOption(key) {
-  if (!/^(deep|name|equals|defaultDecorator|proxy)$/.test(key)) fail$$1("invalid option for (extend)observable: " + key);
+  if (!/^(deep|name|defaultDecorator|proxy)$/.test(key)) fail$$1("invalid option for (extend)observable: " + key);
 }
 
 function asCreateObservableOptions$$1(thing) {
@@ -38384,7 +37512,7 @@ function createObservable(v, arg2, arg3) {
 
   if (isObservable$$1(v)) return v; // something that can be converted and mutated?
 
-  var res = isPlainObject$$1(v) ? observable$$1.object(v, arg2, arg3) : Array.isArray(v) ? observable$$1.array(v, arg2) : isES6Map$$1(v) ? observable$$1.map(v, arg2) : isES6Set$$1(v) ? observable$$1.set(v, arg2) : v; // this value could be converted to a new observable data structure, return it
+  var res = isPlainObject$$1(v) ? observable$$1.object(v, arg2, arg3) : Array.isArray(v) ? observable$$1.array(v, arg2) : isES6Map$$1(v) ? observable$$1.map(v, arg2) : v; // this value could be converted to a new observable data structure, return it
 
   if (res !== v) return res; // otherwise, just box it
 
@@ -38395,7 +37523,7 @@ var observableFactories = {
   box: function (value, options) {
     if (arguments.length > 2) incorrectlyUsedAsDecorator("box");
     var o = asCreateObservableOptions$$1(options);
-    return new ObservableValue$$1(value, getEnhancerFromOptions(o), o.name, true, o.equals);
+    return new ObservableValue$$1(value, getEnhancerFromOptions(o), o.name);
   },
   array: function (initialValues, options) {
     if (arguments.length > 2) incorrectlyUsedAsDecorator("array");
@@ -38406,11 +37534,6 @@ var observableFactories = {
     if (arguments.length > 2) incorrectlyUsedAsDecorator("map");
     var o = asCreateObservableOptions$$1(options);
     return new ObservableMap$$1(initialValues, getEnhancerFromOptions(o), o.name);
-  },
-  set: function (initialValues, options) {
-    if (arguments.length > 2) incorrectlyUsedAsDecorator("set");
-    var o = asCreateObservableOptions$$1(options);
-    return new ObservableSet$$1(initialValues, getEnhancerFromOptions(o), o.name);
   },
   object: function (props, decorators, options) {
     if (typeof arguments[1] === "string") incorrectlyUsedAsDecorator("object");
@@ -38510,20 +37633,11 @@ function createAction$$1(actionName, fn) {
 
 function executeAction$$1(actionName, fn, scope, args) {
   var runInfo = startAction(actionName, fn, scope, args);
-  var shouldSupressReactionError = true;
 
   try {
-    var res = fn.apply(scope, args);
-    shouldSupressReactionError = false;
-    return res;
+    return fn.apply(scope, args);
   } finally {
-    if (shouldSupressReactionError) {
-      globalState$$1.suppressReactionErrors = shouldSupressReactionError;
-      endAction(runInfo);
-      globalState$$1.suppressReactionErrors = false;
-    } else {
-      endAction(runInfo);
-    }
+    endAction(runInfo);
   }
 }
 
@@ -38606,7 +37720,7 @@ var ObservableValue$$1 =
 function (_super) {
   __extends(ObservableValue$$1, _super);
 
-  function ObservableValue$$1(value, enhancer, name, notifySpy, equals) {
+  function ObservableValue$$1(value, enhancer, name, notifySpy) {
     if (name === void 0) {
       name = "ObservableValue@" + getNextId$$1();
     }
@@ -38615,15 +37729,9 @@ function (_super) {
       notifySpy = true;
     }
 
-    if (equals === void 0) {
-      equals = comparer$$1.default;
-    }
-
     var _this = _super.call(this, name) || this;
 
     _this.enhancer = enhancer;
-    _this.name = name;
-    _this.equals = equals;
     _this.hasUnreportedChange = false;
     _this.value = enhancer(value, undefined, name);
 
@@ -38680,7 +37788,7 @@ function (_super) {
 
 
     newValue = this.enhancer(newValue, this.value, this.name);
-    return this.equals(this.value, newValue) ? globalState$$1.UNCHANGED : newValue;
+    return this.value !== newValue ? newValue : globalState$$1.UNCHANGED;
   };
 
   ObservableValue$$1.prototype.setNewValue = function (newValue) {
@@ -39358,12 +38466,6 @@ function () {
      */
 
     this.disableErrorBoundaries = false;
-    /*
-     * If true, we are already handling an exception in an action. Any errors in reactions should be supressed, as
-     * they are not the cause, see: https://github.com/mobxjs/mobx/issues/1836
-     */
-
-    this.suppressReactionErrors = false;
   }
 
   return MobXGlobals$$1;
@@ -39625,7 +38727,7 @@ function logTraceInfo(derivation, observable$$1) {
     var lines = [];
     printDepTree(getDependencyTree$$1(derivation), lines, 1); // prettier-ignore
 
-    new Function("debugger;\n/*\nTracing '" + derivation.name + "'\n\nYou are entering this break point because derivation '" + derivation.name + "' is being traced and '" + observable$$1.name + "' is now forcing it to update.\nJust follow the stacktrace you should now see in the devtools to see precisely what piece of your code is causing this update\nThe stackframe you are looking for is at least ~6-8 stack-frames up.\n\n" + (derivation instanceof ComputedValue$$1 ? derivation.derivation.toString().replace(/[*]\//g, "/") : "") + "\n\nThe dependencies for this derivation are:\n\n" + lines.join("\n") + "\n*/\n    ")();
+    new Function("debugger;\n/*\nTracing '" + derivation.name + "'\n\nYou are entering this break point because derivation '" + derivation.name + "' is being traced and '" + observable$$1.name + "' is now forcing it to update.\nJust follow the stacktrace you should now see in the devtools to see precisely what piece of your code is causing this update\nThe stackframe you are looking for is at least ~6-8 stack-frames up.\n\n" + (derivation instanceof ComputedValue$$1 ? derivation.derivation.toString() : "") + "\n\nThe dependencies for this derivation are:\n\n" + lines.join("\n") + "\n*/\n    ")();
   }
 }
 
@@ -39758,14 +38860,9 @@ function () {
     }
 
     if (globalState$$1.disableErrorBoundaries) throw error;
-    var message = "[mobx] Encountered an uncaught exception that was thrown by a reaction or observer component, in: '" + this + "'";
-
-    if (globalState$$1.suppressReactionErrors) {
-      console.warn("[mobx] (error in reaction '" + this.name + "' suppressed, fix error of causing action below)"); // prettier-ignore
-    } else {
-      console.error(message, error);
-      /** If debugging brought you here, please, read the above message :-). Tnx! */
-    }
+    var message = "[mobx] Encountered an uncaught exception that was thrown by a reaction or observer component, in: '" + this;
+    console.error(message, error);
+    /** If debugging brought you here, please, read the above message :-). Tnx! */
 
     if (isSpyEnabled$$1()) {
       spyReport$$1({
@@ -40210,10 +39307,6 @@ function configure$$1(options) {
       disableErrorBoundaries = options.disableErrorBoundaries,
       reactionScheduler = options.reactionScheduler;
 
-  if (options.isolateGlobalState === true) {
-    isolateGlobalState$$1();
-  }
-
   if (enforceActions !== undefined) {
     if (typeof enforceActions === "boolean" || enforceActions === "strict") deprecated$$1("Deprecated value for 'enforceActions', use 'false' => '\"never\"', 'true' => '\"observed\"', '\"strict\"' => \"'always'\" instead");
     var ea = void 0;
@@ -40244,6 +39337,10 @@ function configure$$1(options) {
 
   if (computedRequiresReaction !== undefined) {
     globalState$$1.computedRequiresReaction = !!computedRequiresReaction;
+  }
+
+  if (options.isolateGlobalState === true) {
+    isolateGlobalState$$1();
   }
 
   if (disableErrorBoundaries !== undefined) {
@@ -40370,7 +39467,7 @@ function flow$$1(generator) {
     var gen = action$$1(name + " - runid: " + runId + " - init", generator).apply(ctx, args);
     var rejector;
     var pendingPromise = undefined;
-    var promise = new Promise(function (resolve, reject) {
+    var res = new Promise(function (resolve, reject) {
       var stepId = 0;
       rejector = reject;
 
@@ -40414,13 +39511,13 @@ function flow$$1(generator) {
 
       onFulfilled(undefined); // kick off the process
     });
-    promise.cancel = action$$1(name + " - runid: " + runId + " - cancel", function () {
+    res.cancel = action$$1(name + " - runid: " + runId + " - cancel", function () {
       try {
         if (pendingPromise) cancelPromise(pendingPromise); // Finally block can return (or yield) stuff..
 
-        var res = gen.return(); // eat anything that promise would do, it's cancelled!
+        var res_1 = gen.return(); // eat anything that promise would do, it's cancelled!
 
-        var yieldedPromise = Promise.resolve(res.value);
+        var yieldedPromise = Promise.resolve(res_1.value);
         yieldedPromise.then(noop$$1, noop$$1);
         cancelPromise(yieldedPromise); // maybe it can be cancelled :)
         // reject our original promise
@@ -40430,7 +39527,7 @@ function flow$$1(generator) {
         rejector(e); // there could be a throwing finally block
       }
     });
-    return promise;
+    return res;
   };
 }
 
@@ -40528,17 +39625,13 @@ function keys$$1(obj) {
     return Array.from(obj.keys());
   }
 
-  if (isObservableSet$$1(obj)) {
-    return Array.from(obj.keys());
-  }
-
   if (isObservableArray$$1(obj)) {
     return obj.map(function (_, index) {
       return index;
     });
   }
 
-  return fail$$1("development" !== "production" && "'keys()' can only be used on observable objects, arrays, sets and maps");
+  return fail$$1("development" !== "production" && "'keys()' can only be used on observable objects, arrays and maps");
 }
 
 function values$$1(obj) {
@@ -40554,15 +39647,11 @@ function values$$1(obj) {
     });
   }
 
-  if (isObservableSet$$1(obj)) {
-    return Array.from(obj.values());
-  }
-
   if (isObservableArray$$1(obj)) {
     return obj.slice();
   }
 
-  return fail$$1("development" !== "production" && "'values()' can only be used on observable objects, arrays, sets and maps");
+  return fail$$1("development" !== "production" && "'values()' can only be used on observable objects, arrays and maps");
 }
 
 function entries$$1(obj) {
@@ -40576,10 +39665,6 @@ function entries$$1(obj) {
     return keys$$1(obj).map(function (key) {
       return [key, obj.get(key)];
     });
-  }
-
-  if (isObservableSet$$1(obj)) {
-    return Array.from(obj.entries());
   }
 
   if (isObservableArray$$1(obj)) {
@@ -40633,8 +39718,6 @@ function remove$$1(obj, key) {
     obj[$mobx$$1].remove(key);
   } else if (isObservableMap$$1(obj)) {
     obj.delete(key);
-  } else if (isObservableSet$$1(obj)) {
-    obj.delete(key);
   } else if (isObservableArray$$1(obj)) {
     if (typeof key !== "number") key = parseInt(key, 10);
     invariant$$1(key >= 0, "Not a valid index: '" + key + "'");
@@ -40650,8 +39733,6 @@ function has$$1(obj, key) {
     var adm = getAdministration$$1(obj);
     return adm.has(key);
   } else if (isObservableMap$$1(obj)) {
-    return obj.has(key);
-  } else if (isObservableSet$$1(obj)) {
     return obj.has(key);
   } else if (isObservableArray$$1(obj)) {
     return key >= 0 && key < obj.length;
@@ -40725,35 +39806,19 @@ function toJSHelper(source, options, __alreadySeen) {
     return res_1;
   }
 
-  if (isObservableSet$$1(source) || Object.getPrototypeOf(source) === Set.prototype) {
+  if (isObservableMap$$1(source) || Object.getPrototypeOf(source) === Map.prototype) {
     if (options.exportMapsAsObjects === false) {
-      var res_2 = cache(__alreadySeen, source, new Set(), options);
-      source.forEach(function (value) {
-        res_2.add(toJSHelper(value, options, __alreadySeen));
+      var res_2 = cache(__alreadySeen, source, new Map(), options);
+      source.forEach(function (value, key) {
+        res_2.set(key, toJSHelper(value, options, __alreadySeen));
       });
       return res_2;
     } else {
-      var res_3 = cache(__alreadySeen, source, [], options);
-      source.forEach(function (value) {
-        res_3.push(toJSHelper(value, options, __alreadySeen));
+      var res_3 = cache(__alreadySeen, source, {}, options);
+      source.forEach(function (value, key) {
+        res_3[key] = toJSHelper(value, options, __alreadySeen);
       });
       return res_3;
-    }
-  }
-
-  if (isObservableMap$$1(source) || Object.getPrototypeOf(source) === Map.prototype) {
-    if (options.exportMapsAsObjects === false) {
-      var res_4 = cache(__alreadySeen, source, new Map(), options);
-      source.forEach(function (value, key) {
-        res_4.set(key, toJSHelper(value, options, __alreadySeen));
-      });
-      return res_4;
-    } else {
-      var res_5 = cache(__alreadySeen, source, {}, options);
-      source.forEach(function (value, key) {
-        res_5[key] = toJSHelper(value, options, __alreadySeen);
-      });
-      return res_5;
     }
   } // Fallback to the situation that source is an ObservableObject or a plain object
 
@@ -41708,13 +40773,9 @@ function () {
             value = _b[1];
 
         return _this.set(key, value);
-      });else if (isES6Map$$1(other)) {
-        if (other.constructor !== Map) return fail$$1("Cannot initialize from classes that inherit from Map: " + other.constructor.name); // prettier-ignore
-
-        other.forEach(function (value, key) {
-          return _this.set(key, value);
-        });
-      } else if (other !== null && other !== undefined) fail$$1("Cannot initialize map from " + other);
+      });else if (isES6Map$$1(other)) other.forEach(function (value, key) {
+        return _this.set(key, value);
+      });else if (other !== null && other !== undefined) fail$$1("Cannot initialize map from " + other);
     });
     return this;
   };
@@ -41856,282 +40917,6 @@ function () {
 exports.ObservableMap = ObservableMap$$1;
 var isObservableMap$$1 = createInstanceofPredicate$$1("ObservableMap", ObservableMap$$1);
 exports.isObservableMap = isObservableMap$$1;
-
-var _a$1;
-
-var ObservableSetMarker = {};
-
-var ObservableSet$$1 =
-/** @class */
-function () {
-  function ObservableSet$$1(initialData, enhancer, name) {
-    if (enhancer === void 0) {
-      enhancer = deepEnhancer$$1;
-    }
-
-    if (name === void 0) {
-      name = "ObservableSet@" + getNextId$$1();
-    }
-
-    this.name = name;
-    this[_a$1] = ObservableSetMarker;
-    this._data = new Set();
-    this._atom = createAtom$$1(this.name);
-    this[Symbol.toStringTag] = "Set";
-
-    if (typeof Set !== "function") {
-      throw new Error("mobx.set requires Set polyfill for the current browser. Check babel-polyfill or core-js/es6/set.js");
-    }
-
-    this.enhancer = function (newV, oldV) {
-      return enhancer(newV, oldV, name);
-    };
-
-    if (initialData) {
-      this.replace(initialData);
-    }
-  }
-
-  ObservableSet$$1.prototype.dehanceValue = function (value) {
-    if (this.dehancer !== undefined) {
-      return this.dehancer(value);
-    }
-
-    return value;
-  };
-
-  ObservableSet$$1.prototype.clear = function () {
-    var _this = this;
-
-    transaction$$1(function () {
-      untracked$$1(function () {
-        var e_1, _a;
-
-        try {
-          for (var _b = __values(_this._data.values()), _c = _b.next(); !_c.done; _c = _b.next()) {
-            var value = _c.value;
-
-            _this.delete(value);
-          }
-        } catch (e_1_1) {
-          e_1 = {
-            error: e_1_1
-          };
-        } finally {
-          try {
-            if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
-          } finally {
-            if (e_1) throw e_1.error;
-          }
-        }
-      });
-    });
-  };
-
-  ObservableSet$$1.prototype.forEach = function (callbackFn, thisArg) {
-    var e_2, _a;
-
-    try {
-      for (var _b = __values(this), _c = _b.next(); !_c.done; _c = _b.next()) {
-        var value = _c.value;
-        callbackFn.call(thisArg, value, value, this);
-      }
-    } catch (e_2_1) {
-      e_2 = {
-        error: e_2_1
-      };
-    } finally {
-      try {
-        if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
-      } finally {
-        if (e_2) throw e_2.error;
-      }
-    }
-  };
-
-  Object.defineProperty(ObservableSet$$1.prototype, "size", {
-    get: function () {
-      this._atom.reportObserved();
-
-      return this._data.size;
-    },
-    enumerable: true,
-    configurable: true
-  });
-
-  ObservableSet$$1.prototype.add = function (value) {
-    var _this = this;
-
-    checkIfStateModificationsAreAllowed$$1(this._atom);
-
-    if (hasInterceptors$$1(this)) {
-      var change = interceptChange$$1(this, {
-        type: "add",
-        object: this,
-        newValue: value
-      });
-      if (!change) return this; // TODO: ideally, value = change.value would be done here, so that values can be
-      // changed by interceptor. Same applies for other Set and Map api's.
-    }
-
-    if (!this.has(value)) {
-      transaction$$1(function () {
-        _this._data.add(_this.enhancer(value, undefined));
-
-        _this._atom.reportChanged();
-      });
-      var notifySpy = isSpyEnabled$$1();
-      var notify = hasListeners$$1(this);
-      var change = notify || notifySpy ? {
-        type: "add",
-        object: this,
-        newValue: value
-      } : null;
-      if (notifySpy && "development" !== "production") spyReportStart$$1(change);
-      if (notify) notifyListeners$$1(this, change);
-      if (notifySpy && "development" !== "production") spyReportEnd$$1();
-    }
-
-    return this;
-  };
-
-  ObservableSet$$1.prototype.delete = function (value) {
-    var _this = this;
-
-    if (hasInterceptors$$1(this)) {
-      var change = interceptChange$$1(this, {
-        type: "delete",
-        object: this,
-        oldValue: value
-      });
-      if (!change) return false;
-    }
-
-    if (this.has(value)) {
-      var notifySpy = isSpyEnabled$$1();
-      var notify = hasListeners$$1(this);
-      var change = notify || notifySpy ? {
-        type: "delete",
-        object: this,
-        oldValue: value
-      } : null;
-      if (notifySpy && "development" !== "production") spyReportStart$$1(__assign({}, change, {
-        name: this.name
-      }));
-      transaction$$1(function () {
-        _this._atom.reportChanged();
-
-        _this._data.delete(value);
-      });
-      if (notify) notifyListeners$$1(this, change);
-      if (notifySpy && "development" !== "production") spyReportEnd$$1();
-      return true;
-    }
-
-    return false;
-  };
-
-  ObservableSet$$1.prototype.has = function (value) {
-    this._atom.reportObserved();
-
-    return this._data.has(this.dehanceValue(value));
-  };
-
-  ObservableSet$$1.prototype.entries = function () {
-    var nextIndex = 0;
-    var keys$$1 = Array.from(this.keys());
-    var values$$1 = Array.from(this.values());
-    return makeIterable({
-      next: function () {
-        var index = nextIndex;
-        nextIndex += 1;
-        return index < values$$1.length ? {
-          value: [keys$$1[index], values$$1[index]],
-          done: false
-        } : {
-          done: true
-        };
-      }
-    });
-  };
-
-  ObservableSet$$1.prototype.keys = function () {
-    return this.values();
-  };
-
-  ObservableSet$$1.prototype.values = function () {
-    this._atom.reportObserved();
-
-    var self = this;
-    var nextIndex = 0;
-    var observableValues = Array.from(this._data.values());
-    return makeIterable({
-      next: function () {
-        return nextIndex < observableValues.length ? {
-          value: self.dehanceValue(observableValues[nextIndex++]),
-          done: false
-        } : {
-          done: true
-        };
-      }
-    });
-  };
-
-  ObservableSet$$1.prototype.replace = function (other) {
-    var _this = this;
-
-    if (isObservableSet$$1(other)) {
-      other = other.toJS();
-    }
-
-    transaction$$1(function () {
-      if (Array.isArray(other)) {
-        _this.clear();
-
-        other.forEach(function (value) {
-          return _this.add(value);
-        });
-      } else if (isES6Set$$1(other)) {
-        _this.clear();
-
-        other.forEach(function (value) {
-          return _this.add(value);
-        });
-      } else if (other !== null && other !== undefined) {
-        fail$$1("Cannot initialize set from " + other);
-      }
-    });
-    return this;
-  };
-
-  ObservableSet$$1.prototype.observe = function (listener, fireImmediately) {
-    // TODO 'fireImmediately' can be true?
-    "development" !== "production" && invariant$$1(fireImmediately !== true, "`observe` doesn't support fireImmediately=true in combination with sets.");
-    return registerListener$$1(this, listener);
-  };
-
-  ObservableSet$$1.prototype.intercept = function (handler) {
-    return registerInterceptor$$1(this, handler);
-  };
-
-  ObservableSet$$1.prototype.toJS = function () {
-    return new Set(this);
-  };
-
-  ObservableSet$$1.prototype.toString = function () {
-    return this.name + "[ " + Array.from(this).join(", ") + " ]";
-  };
-
-  ObservableSet$$1.prototype[(_a$1 = $mobx$$1, Symbol.iterator)] = function () {
-    return this.values();
-  };
-
-  return ObservableSet$$1;
-}();
-
-exports.ObservableSet = ObservableSet$$1;
-var isObservableSet$$1 = createInstanceofPredicate$$1("ObservableSet", ObservableSet$$1);
-exports.isObservableSet = isObservableSet$$1;
 
 var ObservableObjectAdministration$$1 =
 /** @class */
@@ -42435,7 +41220,7 @@ function getAdministrationForComputedPropOwner(owner) {
 
 function generateComputedPropConfig$$1(propName) {
   return computedPropertyConfigs[propName] || (computedPropertyConfigs[propName] = {
-    configurable: false,
+    configurable: true,
     enumerable: false,
     get: function () {
       return getAdministrationForComputedPropOwner(this).read(propName);
@@ -42463,10 +41248,6 @@ function getAtom$$1(thing, property) {
     if (isObservableArray$$1(thing)) {
       if (property !== undefined) fail$$1("development" !== "production" && "It is not possible to get index atoms from arrays");
       return thing[$mobx$$1].atom;
-    }
-
-    if (isObservableSet$$1(thing)) {
-      return thing[$mobx$$1];
     }
 
     if (isObservableMap$$1(thing)) {
@@ -42507,7 +41288,7 @@ function getAdministration$$1(thing, property) {
   if (!thing) fail$$1("Expecting some object");
   if (property !== undefined) return getAdministration$$1(getAtom$$1(thing, property));
   if (isAtom$$1(thing) || isComputedValue$$1(thing) || isReaction$$1(thing)) return thing;
-  if (isObservableMap$$1(thing) || isObservableSet$$1(thing)) return thing; // Initializers run lazily when transpiling to babel, so make sure they are run...
+  if (isObservableMap$$1(thing)) return thing; // Initializers run lazily when transpiling to babel, so make sure they are run...
 
   initializeInstance$$1(thing);
   if (thing[$mobx$$1]) return thing[$mobx$$1];
@@ -42516,7 +41297,7 @@ function getAdministration$$1(thing, property) {
 
 function getDebugName$$1(thing, property) {
   var named;
-  if (property !== undefined) named = getAtom$$1(thing, property);else if (isObservableObject$$1(thing) || isObservableMap$$1(thing) || isObservableSet$$1(thing)) named = getAdministration$$1(thing);else named = getAtom$$1(thing); // valid for arrays as well
+  if (property !== undefined) named = getAtom$$1(thing, property);else if (isObservableObject$$1(thing) || isObservableMap$$1(thing)) named = getAdministration$$1(thing);else named = getAtom$$1(thing); // valid for arrays as well
 
   return named.name;
 }
@@ -42643,7 +41424,6 @@ function deepEq(a, b, aStack, bStack) {
 function unwrap(a) {
   if (isObservableArray$$1(a)) return a.slice();
   if (isES6Map$$1(a) || isObservableMap$$1(a)) return Array.from(a.entries());
-  if (isES6Set$$1(a) || isObservableSet$$1(a)) return Array.from(a.entries());
   return a;
 }
 
@@ -42728,8 +41508,31 @@ const cfg = require('../../darklaunch.config.json');
 const socketIOClient = require('socket.io-client');
 const mobx = require('mobx');
 
+const determineIsEnabled = (darklaunchFlag) => {
+    const darklookup = store.get('darklaunch') || {};
+    if (darklookup[darklaunchFlag]) {
+        const rules = darklookup[darklaunchFlag].rules;
+        if (rules && Object.keys(rules).length) {
+            const rules = darklookup[darklaunchFlag].rules;
+            return Object.keys(rules).reduce((outerAcc, ruleKey) => {
+                return (
+                    outerAcc ||
+                    rules[ruleKey].reduce((innerAcc, rule) => {
+                        return innerAcc || rule === this.configData[ruleKey];
+                    }, false)
+                );
+            }, false);
+        } else {
+            return (darklookup[darklaunchFlag] && darklookup[darklaunchFlag].enabled) || false;
+        }
+    }
+    return false;
+}
+
 class Darklauncher {
     constructor() {
+        this.configData = {};
+        this.actions = ["Error", "Info", "Warn", "StackTrace"];
         if (!this.loadData(cfg)) {
             return;
         }
@@ -42745,6 +41548,7 @@ class Darklauncher {
 
             socket.on('state', (data) => {
                 this.configs = data;
+                console.log(data);
                 store.set('darklaunch', this.configs);
             });
 
@@ -42787,20 +41591,84 @@ class Darklauncher {
         return true;
     }
 
-    isEnabled(darklaunchFlag) {
-        const darklookup = store.get('darklaunch') || {};
-        return darklookup[darklaunchFlag] || false;
+    hackTrace(stackTrace) {
+        // Holy moly
+        // console.oldLog = console.log;
+        // console.log = function()
+        // {
+        //     const output = eval("console.oldLog(stackTrace)")
+        //     return output;
+        // };
+        
+        // const output = eval(`console.log()`);
+        return stackTrace
+        // Overload the console, hoist that variable, set it back.
+    }
+
+    serverLog(meta, action, payload) {
+        axios
+                .post(
+                    `${cfg.settings.url}api/log`, {
+                        project_id: cfg.settings.project,
+                        api_version: cfg.version, 
+                        code: meta.code,
+                        meta,
+                        action,
+                        payload: payload,
+                    }
+                ).catch((err) => {
+                    console.log(err)
+                })
+                // .then(({ data }) => {
+                //     data.map((darklaunch) => {
+                //         this.configs[darklaunch.code] = darklaunch.enabled;
+                //     });
+                //     const shouldRefresh = JSON.stringify(store.get('darklaunch')) !== JSON.stringify(this.configs);
+                //     store.set('darklaunch', this.configs);
+                //     if (shouldRefresh) {
+                //         window.location.reload();
+                //     }
+                // });
+    }
+
+    isEnabled(darklaunchFlag, callback) {
+        const isEnabled = determineIsEnabled(darklaunchFlag)
+        const meta = {
+            configs: this.configData,
+            code: darklaunchFlag,
+        }
+        const darklogger = {}
+        this.actions.forEach((action) => {
+            darklogger[action] = (payload) => {
+                this.serverLog(meta, action, payload)
+            }
+        })
+        if (isEnabled)  {
+            try {
+                callback && callback(darklogger)
+            } catch (e) {
+                console.log(`HACKTRACE`)
+                console.log(this.hackTrace(e.stack))
+                darklogger.StackTrace(e.stack)
+                throw e // Should we throw this? Part of a config?
+            }
+        }
+        return isEnabled
     }
 
     setUser(uuid) {
         this.uuid = uuid;
         localStorage.setItem('darklaunchID', uuid);
     }
+
+    config(loadedConfig) {
+        this.configData = loadedConfig;
+    }
 }
 
 module.exports = new Darklauncher(); // Support Require and Import
 
-},{"axios":"../node_modules/axios/index.js","store":"../node_modules/store/dist/store.legacy.js","../../darklaunch.config.json":"../darklaunch.config.json","socket.io-client":"../node_modules/socket.io-client/lib/index.js","mobx":"../node_modules/mobx/lib/mobx.module.js"}],"../node_modules/classnames/index.js":[function(require,module,exports) {
+},{"axios":"../node_modules/darklaunch-js/node_modules/axios/index.js","store":"../node_modules/darklaunch-js/node_modules/store/dist/store.legacy.js","../../darklaunch.config.json":"../darklaunch.config.json","socket.io-client":"../node_modules/darklaunch-js/node_modules/socket.io-client/lib/index.js","mobx":"../node_modules/darklaunch-js/node_modules/mobx/lib/mobx.module.js"}],"../node_modules/classnames/index.js":[function(require,module,exports) {
 var define;
 /*!
   Copyright (c) 2017 Jed Watson.
@@ -44169,7 +43037,7 @@ if (__DEV__) {
 
 module.exports = warning;
 },{}],"../node_modules/react-is/cjs/react-is.development.js":[function(require,module,exports) {
-/** @license React v16.8.2
+/** @license React v16.8.6
  * react-is.development.js
  *
  * Copyright (c) Facebook, Inc. and its affiliates.
@@ -45080,109 +43948,31 @@ if ("development" !== 'production') {
   // http://fb.me/prop-types-in-prod
   module.exports = require('./factoryWithThrowingShims')();
 }
-},{"react-is":"../node_modules/react-is/index.js","./factoryWithTypeCheckers":"../node_modules/prop-types/factoryWithTypeCheckers.js"}],"../node_modules/history/node_modules/warning/browser.js":[function(require,module,exports) {
-/**
- * Copyright 2014-2015, Facebook, Inc.
- * All rights reserved.
- *
- * This source code is licensed under the BSD-style license found in the
- * LICENSE file in the root directory of this source tree. An additional grant
- * of patent rights can be found in the PATENTS file in the same directory.
- */
-'use strict';
-/**
- * Similar to invariant but only logs a warning if the condition is not met.
- * This can be used to log issues in development environments in critical
- * paths. Removing the logging code for production environments will keep the
- * same logic and follow the same code paths.
- */
+},{"react-is":"../node_modules/react-is/index.js","./factoryWithTypeCheckers":"../node_modules/prop-types/factoryWithTypeCheckers.js"}],"../node_modules/@babel/runtime/helpers/esm/extends.js":[function(require,module,exports) {
+"use strict";
 
-var warning = function () {};
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = _extends;
 
-if ("development" !== 'production') {
-  warning = function (condition, format, args) {
-    var len = arguments.length;
-    args = new Array(len > 2 ? len - 2 : 0);
+function _extends() {
+  exports.default = _extends = Object.assign || function (target) {
+    for (var i = 1; i < arguments.length; i++) {
+      var source = arguments[i];
 
-    for (var key = 2; key < len; key++) {
-      args[key - 2] = arguments[key];
-    }
-
-    if (format === undefined) {
-      throw new Error('`warning(condition, format, ...args)` requires a warning ' + 'message argument');
-    }
-
-    if (format.length < 10 || /^[s\W]*$/.test(format)) {
-      throw new Error('The warning format should be able to uniquely identify this ' + 'warning. Please, use a more descriptive format than: ' + format);
-    }
-
-    if (!condition) {
-      var argIndex = 0;
-      var message = 'Warning: ' + format.replace(/%s/g, function () {
-        return args[argIndex++];
-      });
-
-      if (typeof console !== 'undefined') {
-        console.error(message);
+      for (var key in source) {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+          target[key] = source[key];
+        }
       }
-
-      try {
-        // This error was thrown as a convenience so that you can use this stack
-        // to find the callsite that caused this warning to fire.
-        throw new Error(message);
-      } catch (x) {}
     }
+
+    return target;
   };
+
+  return _extends.apply(this, arguments);
 }
-
-module.exports = warning;
-},{}],"../node_modules/invariant/browser.js":[function(require,module,exports) {
-/**
- * Copyright (c) 2013-present, Facebook, Inc.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */
-'use strict';
-/**
- * Use invariant() to assert state which your program assumes to be true.
- *
- * Provide sprintf-style format (only %s is supported) and arguments
- * to provide information about what broke and what you were
- * expecting.
- *
- * The invariant message will be stripped in production, but the invariant
- * will remain to ensure logic does not differ in production.
- */
-
-var invariant = function (condition, format, a, b, c, d, e, f) {
-  if ("development" !== 'production') {
-    if (format === undefined) {
-      throw new Error('invariant requires an error message argument');
-    }
-  }
-
-  if (!condition) {
-    var error;
-
-    if (format === undefined) {
-      error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
-    } else {
-      var args = [a, b, c, d, e, f];
-      var argIndex = 0;
-      error = new Error(format.replace(/%s/g, function () {
-        return args[argIndex++];
-      }));
-      error.name = 'Invariant Violation';
-    }
-
-    error.framesToPop = 1; // we don't care about invariant's own frame
-
-    throw error;
-  }
-};
-
-module.exports = invariant;
 },{}],"../node_modules/resolve-pathname/index.js":[function(require,module,exports) {
 "use strict";
 
@@ -45304,45 +44094,106 @@ function valueEqual(a, b) {
 
 var _default = valueEqual;
 exports.default = _default;
-},{}],"../node_modules/history/es/PathUtils.js":[function(require,module,exports) {
+},{}],"../node_modules/tiny-warning/dist/tiny-warning.esm.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.createPath = exports.parsePath = exports.stripTrailingSlash = exports.stripBasename = exports.hasBasename = exports.stripLeadingSlash = exports.addLeadingSlash = void 0;
+exports.default = void 0;
+var isProduction = "development" === 'production';
 
-var addLeadingSlash = function addLeadingSlash(path) {
+function warning(condition, message) {
+  if (!isProduction) {
+    if (condition) {
+      return;
+    }
+
+    var text = "Warning: " + message;
+
+    if (typeof console !== 'undefined') {
+      console.warn(text);
+    }
+
+    try {
+      throw Error(text);
+    } catch (x) {}
+  }
+}
+
+var _default = warning;
+exports.default = _default;
+},{}],"../node_modules/tiny-invariant/dist/tiny-invariant.esm.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+var isProduction = "development" === 'production';
+var prefix = 'Invariant failed';
+
+function invariant(condition, message) {
+  if (condition) {
+    return;
+  }
+
+  if (isProduction) {
+    throw new Error(prefix);
+  } else {
+    throw new Error(prefix + ": " + (message || ''));
+  }
+}
+
+var _default = invariant;
+exports.default = _default;
+},{}],"../node_modules/history/esm/history.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.createBrowserHistory = createBrowserHistory;
+exports.createHashHistory = createHashHistory;
+exports.createMemoryHistory = createMemoryHistory;
+exports.createLocation = createLocation;
+exports.locationsAreEqual = locationsAreEqual;
+exports.parsePath = parsePath;
+exports.createPath = createPath;
+
+var _extends2 = _interopRequireDefault(require("@babel/runtime/helpers/esm/extends"));
+
+var _resolvePathname = _interopRequireDefault(require("resolve-pathname"));
+
+var _valueEqual = _interopRequireDefault(require("value-equal"));
+
+var _tinyWarning = _interopRequireDefault(require("tiny-warning"));
+
+var _tinyInvariant = _interopRequireDefault(require("tiny-invariant"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function addLeadingSlash(path) {
   return path.charAt(0) === '/' ? path : '/' + path;
-};
+}
 
-exports.addLeadingSlash = addLeadingSlash;
-
-var stripLeadingSlash = function stripLeadingSlash(path) {
+function stripLeadingSlash(path) {
   return path.charAt(0) === '/' ? path.substr(1) : path;
-};
+}
 
-exports.stripLeadingSlash = stripLeadingSlash;
-
-var hasBasename = function hasBasename(path, prefix) {
+function hasBasename(path, prefix) {
   return new RegExp('^' + prefix + '(\\/|\\?|#|$)', 'i').test(path);
-};
+}
 
-exports.hasBasename = hasBasename;
-
-var stripBasename = function stripBasename(path, prefix) {
+function stripBasename(path, prefix) {
   return hasBasename(path, prefix) ? path.substr(prefix.length) : path;
-};
+}
 
-exports.stripBasename = stripBasename;
-
-var stripTrailingSlash = function stripTrailingSlash(path) {
+function stripTrailingSlash(path) {
   return path.charAt(path.length - 1) === '/' ? path.slice(0, -1) : path;
-};
+}
 
-exports.stripTrailingSlash = stripTrailingSlash;
-
-var parsePath = function parsePath(path) {
+function parsePath(path) {
   var pathname = path || '/';
   var search = '';
   var hash = '';
@@ -45365,61 +44216,28 @@ var parsePath = function parsePath(path) {
     search: search === '?' ? '' : search,
     hash: hash === '#' ? '' : hash
   };
-};
+}
 
-exports.parsePath = parsePath;
-
-var createPath = function createPath(location) {
+function createPath(location) {
   var pathname = location.pathname,
       search = location.search,
       hash = location.hash;
   var path = pathname || '/';
-  if (search && search !== '?') path += search.charAt(0) === '?' ? search : '?' + search;
-  if (hash && hash !== '#') path += hash.charAt(0) === '#' ? hash : '#' + hash;
+  if (search && search !== '?') path += search.charAt(0) === '?' ? search : "?" + search;
+  if (hash && hash !== '#') path += hash.charAt(0) === '#' ? hash : "#" + hash;
   return path;
-};
+}
 
-exports.createPath = createPath;
-},{}],"../node_modules/history/es/LocationUtils.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.locationsAreEqual = exports.createLocation = void 0;
-
-var _resolvePathname = _interopRequireDefault(require("resolve-pathname"));
-
-var _valueEqual = _interopRequireDefault(require("value-equal"));
-
-var _PathUtils = require("./PathUtils");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var _extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];
-
-    for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }
-
-  return target;
-};
-
-var createLocation = function createLocation(path, state, key, currentLocation) {
-  var location = void 0;
+function createLocation(path, state, key, currentLocation) {
+  var location;
 
   if (typeof path === 'string') {
     // Two-arg form: push(path, state)
-    location = (0, _PathUtils.parsePath)(path);
+    location = parsePath(path);
     location.state = state;
   } else {
     // One-arg form: push(location)
-    location = _extends({}, path);
+    location = (0, _extends2.default)({}, path);
     if (location.pathname === undefined) location.pathname = '';
 
     if (location.search) {
@@ -45464,39 +44282,24 @@ var createLocation = function createLocation(path, state, key, currentLocation) 
   }
 
   return location;
-};
+}
 
-exports.createLocation = createLocation;
-
-var locationsAreEqual = function locationsAreEqual(a, b) {
+function locationsAreEqual(a, b) {
   return a.pathname === b.pathname && a.search === b.search && a.hash === b.hash && a.key === b.key && (0, _valueEqual.default)(a.state, b.state);
-};
+}
 
-exports.locationsAreEqual = locationsAreEqual;
-},{"resolve-pathname":"../node_modules/resolve-pathname/index.js","value-equal":"../node_modules/value-equal/index.js","./PathUtils":"../node_modules/history/es/PathUtils.js"}],"../node_modules/history/es/createTransitionManager.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _warning = _interopRequireDefault(require("warning"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var createTransitionManager = function createTransitionManager() {
+function createTransitionManager() {
   var prompt = null;
 
-  var setPrompt = function setPrompt(nextPrompt) {
-    (0, _warning.default)(prompt == null, 'A history supports only one prompt at a time');
+  function setPrompt(nextPrompt) {
+    "development" !== "production" ? (0, _tinyWarning.default)(prompt == null, 'A history supports only one prompt at a time') : void 0;
     prompt = nextPrompt;
     return function () {
       if (prompt === nextPrompt) prompt = null;
     };
-  };
+  }
 
-  var confirmTransitionTo = function confirmTransitionTo(location, action, getUserConfirmation, callback) {
+  function confirmTransitionTo(location, action, getUserConfirmation, callback) {
     // TODO: If another transition starts while we're still confirming
     // the previous one, we may end up in a weird state. Figure out the
     // best way to handle this.
@@ -45507,7 +44310,7 @@ var createTransitionManager = function createTransitionManager() {
         if (typeof getUserConfirmation === 'function') {
           getUserConfirmation(result, callback);
         } else {
-          (0, _warning.default)(false, 'A history needs a getUserConfirmation function in order to use a prompt message');
+          "development" !== "production" ? (0, _tinyWarning.default)(false, 'A history needs a getUserConfirmation function in order to use a prompt message') : void 0;
           callback(true);
         }
       } else {
@@ -45517,16 +44320,16 @@ var createTransitionManager = function createTransitionManager() {
     } else {
       callback(true);
     }
-  };
+  }
 
   var listeners = [];
 
-  var appendListener = function appendListener(fn) {
+  function appendListener(fn) {
     var isActive = true;
 
-    var listener = function listener() {
-      if (isActive) fn.apply(undefined, arguments);
-    };
+    function listener() {
+      if (isActive) fn.apply(void 0, arguments);
+    }
 
     listeners.push(listener);
     return function () {
@@ -45535,17 +44338,17 @@ var createTransitionManager = function createTransitionManager() {
         return item !== listener;
       });
     };
-  };
+  }
 
-  var notifyListeners = function notifyListeners() {
-    for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+  function notifyListeners() {
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
       args[_key] = arguments[_key];
     }
 
     listeners.forEach(function (listener) {
-      return listener.apply(undefined, args);
+      return listener.apply(void 0, args);
     });
-  };
+  }
 
   return {
     setPrompt: setPrompt,
@@ -45553,36 +44356,13 @@ var createTransitionManager = function createTransitionManager() {
     appendListener: appendListener,
     notifyListeners: notifyListeners
   };
-};
+}
 
-var _default = createTransitionManager;
-exports.default = _default;
-},{"warning":"../node_modules/history/node_modules/warning/browser.js"}],"../node_modules/history/es/DOMUtils.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.isExtraneousPopstateEvent = exports.supportsGoWithoutReloadUsingHash = exports.supportsPopStateOnHashChange = exports.supportsHistory = exports.getConfirmation = exports.removeEventListener = exports.addEventListener = exports.canUseDOM = void 0;
 var canUseDOM = !!(typeof window !== 'undefined' && window.document && window.document.createElement);
-exports.canUseDOM = canUseDOM;
 
-var addEventListener = function addEventListener(node, event, listener) {
-  return node.addEventListener ? node.addEventListener(event, listener, false) : node.attachEvent('on' + event, listener);
-};
-
-exports.addEventListener = addEventListener;
-
-var removeEventListener = function removeEventListener(node, event, listener) {
-  return node.removeEventListener ? node.removeEventListener(event, listener, false) : node.detachEvent('on' + event, listener);
-};
-
-exports.removeEventListener = removeEventListener;
-
-var getConfirmation = function getConfirmation(message, callback) {
-  return callback(window.confirm(message));
-}; // eslint-disable-line no-alert
-
+function getConfirmation(message, callback) {
+  callback(window.confirm(message)); // eslint-disable-line no-alert
+}
 /**
  * Returns true if the HTML5 history API is supported. Taken from Modernizr.
  *
@@ -45592,34 +44372,28 @@ var getConfirmation = function getConfirmation(message, callback) {
  */
 
 
-exports.getConfirmation = getConfirmation;
-
-var supportsHistory = function supportsHistory() {
+function supportsHistory() {
   var ua = window.navigator.userAgent;
   if ((ua.indexOf('Android 2.') !== -1 || ua.indexOf('Android 4.0') !== -1) && ua.indexOf('Mobile Safari') !== -1 && ua.indexOf('Chrome') === -1 && ua.indexOf('Windows Phone') === -1) return false;
   return window.history && 'pushState' in window.history;
-};
+}
 /**
  * Returns true if browser fires popstate on hash change.
  * IE10 and IE11 do not.
  */
 
 
-exports.supportsHistory = supportsHistory;
-
-var supportsPopStateOnHashChange = function supportsPopStateOnHashChange() {
+function supportsPopStateOnHashChange() {
   return window.navigator.userAgent.indexOf('Trident') === -1;
-};
+}
 /**
  * Returns false if using go(n) with hash history causes a full page reload.
  */
 
 
-exports.supportsPopStateOnHashChange = supportsPopStateOnHashChange;
-
-var supportsGoWithoutReloadUsingHash = function supportsGoWithoutReloadUsingHash() {
+function supportsGoWithoutReloadUsingHash() {
   return window.navigator.userAgent.indexOf('Firefox') === -1;
-};
+}
 /**
  * Returns true if a given popstate event is an extraneous WebKit event.
  * Accounts for the fact that Chrome on iOS fires real popstate events
@@ -45627,59 +44401,14 @@ var supportsGoWithoutReloadUsingHash = function supportsGoWithoutReloadUsingHash
  */
 
 
-exports.supportsGoWithoutReloadUsingHash = supportsGoWithoutReloadUsingHash;
-
-var isExtraneousPopstateEvent = function isExtraneousPopstateEvent(event) {
-  return event.state === undefined && navigator.userAgent.indexOf('CriOS') === -1;
-};
-
-exports.isExtraneousPopstateEvent = isExtraneousPopstateEvent;
-},{}],"../node_modules/history/es/createBrowserHistory.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _warning = _interopRequireDefault(require("warning"));
-
-var _invariant = _interopRequireDefault(require("invariant"));
-
-var _LocationUtils = require("./LocationUtils");
-
-var _PathUtils = require("./PathUtils");
-
-var _createTransitionManager = _interopRequireDefault(require("./createTransitionManager"));
-
-var _DOMUtils = require("./DOMUtils");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
-  return typeof obj;
-} : function (obj) {
-  return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-};
-
-var _extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];
-
-    for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }
-
-  return target;
-};
+function isExtraneousPopstateEvent(event) {
+  event.state === undefined && navigator.userAgent.indexOf('CriOS') === -1;
+}
 
 var PopStateEvent = 'popstate';
 var HashChangeEvent = 'hashchange';
 
-var getHistoryState = function getHistoryState() {
+function getHistoryState() {
   try {
     return window.history.state || {};
   } catch (e) {
@@ -45687,28 +44416,32 @@ var getHistoryState = function getHistoryState() {
     // See https://github.com/ReactTraining/history/pull/289
     return {};
   }
-};
+}
 /**
  * Creates a history object that uses the HTML5 history API including
  * pushState, replaceState, and the popstate event.
  */
 
 
-var createBrowserHistory = function createBrowserHistory() {
-  var props = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  (0, _invariant.default)(_DOMUtils.canUseDOM, 'Browser history needs a DOM');
-  var globalHistory = window.history;
-  var canUseHistory = (0, _DOMUtils.supportsHistory)();
-  var needsHashChangeListener = !(0, _DOMUtils.supportsPopStateOnHashChange)();
-  var _props$forceRefresh = props.forceRefresh,
-      forceRefresh = _props$forceRefresh === undefined ? false : _props$forceRefresh,
-      _props$getUserConfirm = props.getUserConfirmation,
-      getUserConfirmation = _props$getUserConfirm === undefined ? _DOMUtils.getConfirmation : _props$getUserConfirm,
-      _props$keyLength = props.keyLength,
-      keyLength = _props$keyLength === undefined ? 6 : _props$keyLength;
-  var basename = props.basename ? (0, _PathUtils.stripTrailingSlash)((0, _PathUtils.addLeadingSlash)(props.basename)) : '';
+function createBrowserHistory(props) {
+  if (props === void 0) {
+    props = {};
+  }
 
-  var getDOMLocation = function getDOMLocation(historyState) {
+  !canUseDOM ? "development" !== "production" ? (0, _tinyInvariant.default)(false, 'Browser history needs a DOM') : (0, _tinyInvariant.default)(false) : void 0;
+  var globalHistory = window.history;
+  var canUseHistory = supportsHistory();
+  var needsHashChangeListener = !supportsPopStateOnHashChange();
+  var _props = props,
+      _props$forceRefresh = _props.forceRefresh,
+      forceRefresh = _props$forceRefresh === void 0 ? false : _props$forceRefresh,
+      _props$getUserConfirm = _props.getUserConfirmation,
+      getUserConfirmation = _props$getUserConfirm === void 0 ? getConfirmation : _props$getUserConfirm,
+      _props$keyLength = _props.keyLength,
+      keyLength = _props$keyLength === void 0 ? 6 : _props$keyLength;
+  var basename = props.basename ? stripTrailingSlash(addLeadingSlash(props.basename)) : '';
+
+  function getDOMLocation(historyState) {
     var _ref = historyState || {},
         key = _ref.key,
         state = _ref.state;
@@ -45718,37 +44451,36 @@ var createBrowserHistory = function createBrowserHistory() {
         search = _window$location.search,
         hash = _window$location.hash;
     var path = pathname + search + hash;
-    (0, _warning.default)(!basename || (0, _PathUtils.hasBasename)(path, basename), 'You are attempting to use a basename on a page whose URL path does not begin ' + 'with the basename. Expected path "' + path + '" to begin with "' + basename + '".');
-    if (basename) path = (0, _PathUtils.stripBasename)(path, basename);
-    return (0, _LocationUtils.createLocation)(path, state, key);
-  };
+    "development" !== "production" ? (0, _tinyWarning.default)(!basename || hasBasename(path, basename), 'You are attempting to use a basename on a page whose URL path does not begin ' + 'with the basename. Expected path "' + path + '" to begin with "' + basename + '".') : void 0;
+    if (basename) path = stripBasename(path, basename);
+    return createLocation(path, state, key);
+  }
 
-  var createKey = function createKey() {
+  function createKey() {
     return Math.random().toString(36).substr(2, keyLength);
-  };
+  }
 
-  var transitionManager = (0, _createTransitionManager.default)();
+  var transitionManager = createTransitionManager();
 
-  var setState = function setState(nextState) {
-    _extends(history, nextState);
-
+  function setState(nextState) {
+    (0, _extends2.default)(history, nextState);
     history.length = globalHistory.length;
     transitionManager.notifyListeners(history.location, history.action);
-  };
+  }
 
-  var handlePopState = function handlePopState(event) {
+  function handlePopState(event) {
     // Ignore extraneous popstate events in WebKit.
-    if ((0, _DOMUtils.isExtraneousPopstateEvent)(event)) return;
+    if (isExtraneousPopstateEvent(event)) return;
     handlePop(getDOMLocation(event.state));
-  };
+  }
 
-  var handleHashChange = function handleHashChange() {
+  function handleHashChange() {
     handlePop(getDOMLocation(getHistoryState()));
-  };
+  }
 
   var forceNextPop = false;
 
-  var handlePop = function handlePop(location) {
+  function handlePop(location) {
     if (forceNextPop) {
       forceNextPop = false;
       setState();
@@ -45765,9 +44497,9 @@ var createBrowserHistory = function createBrowserHistory() {
         }
       });
     }
-  };
+  }
 
-  var revertPop = function revertPop(fromLocation) {
+  function revertPop(fromLocation) {
     var toLocation = history.location; // TODO: We could probably make this more reliable by
     // keeping a list of keys we've seen in sessionStorage.
     // Instead, we just default to 0 for keys we don't know.
@@ -45782,19 +44514,19 @@ var createBrowserHistory = function createBrowserHistory() {
       forceNextPop = true;
       go(delta);
     }
-  };
+  }
 
   var initialLocation = getDOMLocation(getHistoryState());
   var allKeys = [initialLocation.key]; // Public interface
 
-  var createHref = function createHref(location) {
-    return basename + (0, _PathUtils.createPath)(location);
-  };
+  function createHref(location) {
+    return basename + createPath(location);
+  }
 
-  var push = function push(path, state) {
-    (0, _warning.default)(!((typeof path === 'undefined' ? 'undefined' : _typeof(path)) === 'object' && path.state !== undefined && state !== undefined), 'You should avoid providing a 2nd state argument to push when the 1st ' + 'argument is a location-like object that already has state; it is ignored');
+  function push(path, state) {
+    "development" !== "production" ? (0, _tinyWarning.default)(!(typeof path === 'object' && path.state !== undefined && state !== undefined), 'You should avoid providing a 2nd state argument to push when the 1st ' + 'argument is a location-like object that already has state; it is ignored') : void 0;
     var action = 'PUSH';
-    var location = (0, _LocationUtils.createLocation)(path, state, createKey(), history.location);
+    var location = createLocation(path, state, createKey(), history.location);
     transitionManager.confirmTransitionTo(location, action, getUserConfirmation, function (ok) {
       if (!ok) return;
       var href = createHref(location);
@@ -45820,16 +44552,16 @@ var createBrowserHistory = function createBrowserHistory() {
           });
         }
       } else {
-        (0, _warning.default)(state === undefined, 'Browser history cannot push state in browsers that do not support HTML5 history');
+        "development" !== "production" ? (0, _tinyWarning.default)(state === undefined, 'Browser history cannot push state in browsers that do not support HTML5 history') : void 0;
         window.location.href = href;
       }
     });
-  };
+  }
 
-  var replace = function replace(path, state) {
-    (0, _warning.default)(!((typeof path === 'undefined' ? 'undefined' : _typeof(path)) === 'object' && path.state !== undefined && state !== undefined), 'You should avoid providing a 2nd state argument to replace when the 1st ' + 'argument is a location-like object that already has state; it is ignored');
+  function replace(path, state) {
+    "development" !== "production" ? (0, _tinyWarning.default)(!(typeof path === 'object' && path.state !== undefined && state !== undefined), 'You should avoid providing a 2nd state argument to replace when the 1st ' + 'argument is a location-like object that already has state; it is ignored') : void 0;
     var action = 'REPLACE';
-    var location = (0, _LocationUtils.createLocation)(path, state, createKey(), history.location);
+    var location = createLocation(path, state, createKey(), history.location);
     transitionManager.confirmTransitionTo(location, action, getUserConfirmation, function (ok) {
       if (!ok) return;
       var href = createHref(location);
@@ -45853,42 +44585,45 @@ var createBrowserHistory = function createBrowserHistory() {
           });
         }
       } else {
-        (0, _warning.default)(state === undefined, 'Browser history cannot replace state in browsers that do not support HTML5 history');
+        "development" !== "production" ? (0, _tinyWarning.default)(state === undefined, 'Browser history cannot replace state in browsers that do not support HTML5 history') : void 0;
         window.location.replace(href);
       }
     });
-  };
+  }
 
-  var go = function go(n) {
+  function go(n) {
     globalHistory.go(n);
-  };
+  }
 
-  var goBack = function goBack() {
-    return go(-1);
-  };
+  function goBack() {
+    go(-1);
+  }
 
-  var goForward = function goForward() {
-    return go(1);
-  };
+  function goForward() {
+    go(1);
+  }
 
   var listenerCount = 0;
 
-  var checkDOMListeners = function checkDOMListeners(delta) {
+  function checkDOMListeners(delta) {
     listenerCount += delta;
 
-    if (listenerCount === 1) {
-      (0, _DOMUtils.addEventListener)(window, PopStateEvent, handlePopState);
-      if (needsHashChangeListener) (0, _DOMUtils.addEventListener)(window, HashChangeEvent, handleHashChange);
+    if (listenerCount === 1 && delta === 1) {
+      window.addEventListener(PopStateEvent, handlePopState);
+      if (needsHashChangeListener) window.addEventListener(HashChangeEvent, handleHashChange);
     } else if (listenerCount === 0) {
-      (0, _DOMUtils.removeEventListener)(window, PopStateEvent, handlePopState);
-      if (needsHashChangeListener) (0, _DOMUtils.removeEventListener)(window, HashChangeEvent, handleHashChange);
+      window.removeEventListener(PopStateEvent, handlePopState);
+      if (needsHashChangeListener) window.removeEventListener(HashChangeEvent, handleHashChange);
     }
-  };
+  }
 
   var isBlocked = false;
 
-  var block = function block() {
-    var prompt = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+  function block(prompt) {
+    if (prompt === void 0) {
+      prompt = false;
+    }
+
     var unblock = transitionManager.setPrompt(prompt);
 
     if (!isBlocked) {
@@ -45904,16 +44639,16 @@ var createBrowserHistory = function createBrowserHistory() {
 
       return unblock();
     };
-  };
+  }
 
-  var listen = function listen(listener) {
+  function listen(listener) {
     var unlisten = transitionManager.appendListener(listener);
     checkDOMListeners(1);
     return function () {
       checkDOMListeners(-1);
       unlisten();
     };
-  };
+  }
 
   var history = {
     length: globalHistory.length,
@@ -45929,117 +44664,82 @@ var createBrowserHistory = function createBrowserHistory() {
     listen: listen
   };
   return history;
-};
+}
 
-var _default = createBrowserHistory;
-exports.default = _default;
-},{"warning":"../node_modules/history/node_modules/warning/browser.js","invariant":"../node_modules/invariant/browser.js","./LocationUtils":"../node_modules/history/es/LocationUtils.js","./PathUtils":"../node_modules/history/es/PathUtils.js","./createTransitionManager":"../node_modules/history/es/createTransitionManager.js","./DOMUtils":"../node_modules/history/es/DOMUtils.js"}],"../node_modules/history/es/createHashHistory.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _warning = _interopRequireDefault(require("warning"));
-
-var _invariant = _interopRequireDefault(require("invariant"));
-
-var _LocationUtils = require("./LocationUtils");
-
-var _PathUtils = require("./PathUtils");
-
-var _createTransitionManager = _interopRequireDefault(require("./createTransitionManager"));
-
-var _DOMUtils = require("./DOMUtils");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var _extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];
-
-    for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }
-
-  return target;
-};
-
-var HashChangeEvent = 'hashchange';
+var HashChangeEvent$1 = 'hashchange';
 var HashPathCoders = {
   hashbang: {
     encodePath: function encodePath(path) {
-      return path.charAt(0) === '!' ? path : '!/' + (0, _PathUtils.stripLeadingSlash)(path);
+      return path.charAt(0) === '!' ? path : '!/' + stripLeadingSlash(path);
     },
     decodePath: function decodePath(path) {
       return path.charAt(0) === '!' ? path.substr(1) : path;
     }
   },
   noslash: {
-    encodePath: _PathUtils.stripLeadingSlash,
-    decodePath: _PathUtils.addLeadingSlash
+    encodePath: stripLeadingSlash,
+    decodePath: addLeadingSlash
   },
   slash: {
-    encodePath: _PathUtils.addLeadingSlash,
-    decodePath: _PathUtils.addLeadingSlash
+    encodePath: addLeadingSlash,
+    decodePath: addLeadingSlash
   }
 };
 
-var getHashPath = function getHashPath() {
+function getHashPath() {
   // We can't use window.location.hash here because it's not
   // consistent across browsers - Firefox will pre-decode it!
   var href = window.location.href;
   var hashIndex = href.indexOf('#');
   return hashIndex === -1 ? '' : href.substring(hashIndex + 1);
-};
+}
 
-var pushHashPath = function pushHashPath(path) {
-  return window.location.hash = path;
-};
+function pushHashPath(path) {
+  window.location.hash = path;
+}
 
-var replaceHashPath = function replaceHashPath(path) {
+function replaceHashPath(path) {
   var hashIndex = window.location.href.indexOf('#');
   window.location.replace(window.location.href.slice(0, hashIndex >= 0 ? hashIndex : 0) + '#' + path);
-};
+}
 
-var createHashHistory = function createHashHistory() {
-  var props = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  (0, _invariant.default)(_DOMUtils.canUseDOM, 'Hash history needs a DOM');
+function createHashHistory(props) {
+  if (props === void 0) {
+    props = {};
+  }
+
+  !canUseDOM ? "development" !== "production" ? (0, _tinyInvariant.default)(false, 'Hash history needs a DOM') : (0, _tinyInvariant.default)(false) : void 0;
   var globalHistory = window.history;
-  var canGoWithoutReload = (0, _DOMUtils.supportsGoWithoutReloadUsingHash)();
-  var _props$getUserConfirm = props.getUserConfirmation,
-      getUserConfirmation = _props$getUserConfirm === undefined ? _DOMUtils.getConfirmation : _props$getUserConfirm,
-      _props$hashType = props.hashType,
-      hashType = _props$hashType === undefined ? 'slash' : _props$hashType;
-  var basename = props.basename ? (0, _PathUtils.stripTrailingSlash)((0, _PathUtils.addLeadingSlash)(props.basename)) : '';
+  var canGoWithoutReload = supportsGoWithoutReloadUsingHash();
+  var _props = props,
+      _props$getUserConfirm = _props.getUserConfirmation,
+      getUserConfirmation = _props$getUserConfirm === void 0 ? getConfirmation : _props$getUserConfirm,
+      _props$hashType = _props.hashType,
+      hashType = _props$hashType === void 0 ? 'slash' : _props$hashType;
+  var basename = props.basename ? stripTrailingSlash(addLeadingSlash(props.basename)) : '';
   var _HashPathCoders$hashT = HashPathCoders[hashType],
       encodePath = _HashPathCoders$hashT.encodePath,
       decodePath = _HashPathCoders$hashT.decodePath;
 
-  var getDOMLocation = function getDOMLocation() {
+  function getDOMLocation() {
     var path = decodePath(getHashPath());
-    (0, _warning.default)(!basename || (0, _PathUtils.hasBasename)(path, basename), 'You are attempting to use a basename on a page whose URL path does not begin ' + 'with the basename. Expected path "' + path + '" to begin with "' + basename + '".');
-    if (basename) path = (0, _PathUtils.stripBasename)(path, basename);
-    return (0, _LocationUtils.createLocation)(path);
-  };
+    "development" !== "production" ? (0, _tinyWarning.default)(!basename || hasBasename(path, basename), 'You are attempting to use a basename on a page whose URL path does not begin ' + 'with the basename. Expected path "' + path + '" to begin with "' + basename + '".') : void 0;
+    if (basename) path = stripBasename(path, basename);
+    return createLocation(path);
+  }
 
-  var transitionManager = (0, _createTransitionManager.default)();
+  var transitionManager = createTransitionManager();
 
-  var setState = function setState(nextState) {
-    _extends(history, nextState);
-
+  function setState(nextState) {
+    (0, _extends2.default)(history, nextState);
     history.length = globalHistory.length;
     transitionManager.notifyListeners(history.location, history.action);
-  };
+  }
 
   var forceNextPop = false;
   var ignorePath = null;
 
-  var handleHashChange = function handleHashChange() {
+  function handleHashChange() {
     var path = getHashPath();
     var encodedPath = encodePath(path);
 
@@ -46049,16 +44749,16 @@ var createHashHistory = function createHashHistory() {
     } else {
       var location = getDOMLocation();
       var prevLocation = history.location;
-      if (!forceNextPop && (0, _LocationUtils.locationsAreEqual)(prevLocation, location)) return; // A hashchange doesn't always == location change.
+      if (!forceNextPop && locationsAreEqual(prevLocation, location)) return; // A hashchange doesn't always == location change.
 
-      if (ignorePath === (0, _PathUtils.createPath)(location)) return; // Ignore this change; we already setState in push/replace.
+      if (ignorePath === createPath(location)) return; // Ignore this change; we already setState in push/replace.
 
       ignorePath = null;
       handlePop(location);
     }
-  };
+  }
 
-  var handlePop = function handlePop(location) {
+  function handlePop(location) {
     if (forceNextPop) {
       forceNextPop = false;
       setState();
@@ -46075,16 +44775,16 @@ var createHashHistory = function createHashHistory() {
         }
       });
     }
-  };
+  }
 
-  var revertPop = function revertPop(fromLocation) {
+  function revertPop(fromLocation) {
     var toLocation = history.location; // TODO: We could probably make this more reliable by
     // keeping a list of paths we've seen in sessionStorage.
     // Instead, we just default to 0 for paths we don't know.
 
-    var toIndex = allPaths.lastIndexOf((0, _PathUtils.createPath)(toLocation));
+    var toIndex = allPaths.lastIndexOf(createPath(toLocation));
     if (toIndex === -1) toIndex = 0;
-    var fromIndex = allPaths.lastIndexOf((0, _PathUtils.createPath)(fromLocation));
+    var fromIndex = allPaths.lastIndexOf(createPath(fromLocation));
     if (fromIndex === -1) fromIndex = 0;
     var delta = toIndex - fromIndex;
 
@@ -46092,26 +44792,26 @@ var createHashHistory = function createHashHistory() {
       forceNextPop = true;
       go(delta);
     }
-  }; // Ensure the hash is encoded properly before doing anything else.
+  } // Ensure the hash is encoded properly before doing anything else.
 
 
   var path = getHashPath();
   var encodedPath = encodePath(path);
   if (path !== encodedPath) replaceHashPath(encodedPath);
   var initialLocation = getDOMLocation();
-  var allPaths = [(0, _PathUtils.createPath)(initialLocation)]; // Public interface
+  var allPaths = [createPath(initialLocation)]; // Public interface
 
-  var createHref = function createHref(location) {
-    return '#' + encodePath(basename + (0, _PathUtils.createPath)(location));
-  };
+  function createHref(location) {
+    return '#' + encodePath(basename + createPath(location));
+  }
 
-  var push = function push(path, state) {
-    (0, _warning.default)(state === undefined, 'Hash history cannot push state; it is ignored');
+  function push(path, state) {
+    "development" !== "production" ? (0, _tinyWarning.default)(state === undefined, 'Hash history cannot push state; it is ignored') : void 0;
     var action = 'PUSH';
-    var location = (0, _LocationUtils.createLocation)(path, undefined, undefined, history.location);
+    var location = createLocation(path, undefined, undefined, history.location);
     transitionManager.confirmTransitionTo(location, action, getUserConfirmation, function (ok) {
       if (!ok) return;
-      var path = (0, _PathUtils.createPath)(location);
+      var path = createPath(location);
       var encodedPath = encodePath(basename + path);
       var hashChanged = getHashPath() !== encodedPath;
 
@@ -46121,7 +44821,7 @@ var createHashHistory = function createHashHistory() {
         // is that other hash histories in the page will consider it a POP.
         ignorePath = path;
         pushHashPath(encodedPath);
-        var prevIndex = allPaths.lastIndexOf((0, _PathUtils.createPath)(history.location));
+        var prevIndex = allPaths.lastIndexOf(createPath(history.location));
         var nextPaths = allPaths.slice(0, prevIndex === -1 ? 0 : prevIndex + 1);
         nextPaths.push(path);
         allPaths = nextPaths;
@@ -46130,19 +44830,19 @@ var createHashHistory = function createHashHistory() {
           location: location
         });
       } else {
-        (0, _warning.default)(false, 'Hash history cannot PUSH the same path; a new entry will not be added to the history stack');
+        "development" !== "production" ? (0, _tinyWarning.default)(false, 'Hash history cannot PUSH the same path; a new entry will not be added to the history stack') : void 0;
         setState();
       }
     });
-  };
+  }
 
-  var replace = function replace(path, state) {
-    (0, _warning.default)(state === undefined, 'Hash history cannot replace state; it is ignored');
+  function replace(path, state) {
+    "development" !== "production" ? (0, _tinyWarning.default)(state === undefined, 'Hash history cannot replace state; it is ignored') : void 0;
     var action = 'REPLACE';
-    var location = (0, _LocationUtils.createLocation)(path, undefined, undefined, history.location);
+    var location = createLocation(path, undefined, undefined, history.location);
     transitionManager.confirmTransitionTo(location, action, getUserConfirmation, function (ok) {
       if (!ok) return;
-      var path = (0, _PathUtils.createPath)(location);
+      var path = createPath(location);
       var encodedPath = encodePath(basename + path);
       var hashChanged = getHashPath() !== encodedPath;
 
@@ -46154,44 +44854,47 @@ var createHashHistory = function createHashHistory() {
         replaceHashPath(encodedPath);
       }
 
-      var prevIndex = allPaths.indexOf((0, _PathUtils.createPath)(history.location));
+      var prevIndex = allPaths.indexOf(createPath(history.location));
       if (prevIndex !== -1) allPaths[prevIndex] = path;
       setState({
         action: action,
         location: location
       });
     });
-  };
+  }
 
-  var go = function go(n) {
-    (0, _warning.default)(canGoWithoutReload, 'Hash history go(n) causes a full page reload in this browser');
+  function go(n) {
+    "development" !== "production" ? (0, _tinyWarning.default)(canGoWithoutReload, 'Hash history go(n) causes a full page reload in this browser') : void 0;
     globalHistory.go(n);
-  };
+  }
 
-  var goBack = function goBack() {
-    return go(-1);
-  };
+  function goBack() {
+    go(-1);
+  }
 
-  var goForward = function goForward() {
-    return go(1);
-  };
+  function goForward() {
+    go(1);
+  }
 
   var listenerCount = 0;
 
-  var checkDOMListeners = function checkDOMListeners(delta) {
+  function checkDOMListeners(delta) {
     listenerCount += delta;
 
-    if (listenerCount === 1) {
-      (0, _DOMUtils.addEventListener)(window, HashChangeEvent, handleHashChange);
+    if (listenerCount === 1 && delta === 1) {
+      window.addEventListener(HashChangeEvent$1, handleHashChange);
     } else if (listenerCount === 0) {
-      (0, _DOMUtils.removeEventListener)(window, HashChangeEvent, handleHashChange);
+      window.removeEventListener(HashChangeEvent$1, handleHashChange);
     }
-  };
+  }
 
   var isBlocked = false;
 
-  var block = function block() {
-    var prompt = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+  function block(prompt) {
+    if (prompt === void 0) {
+      prompt = false;
+    }
+
     var unblock = transitionManager.setPrompt(prompt);
 
     if (!isBlocked) {
@@ -46207,16 +44910,16 @@ var createHashHistory = function createHashHistory() {
 
       return unblock();
     };
-  };
+  }
 
-  var listen = function listen(listener) {
+  function listen(listener) {
     var unlisten = transitionManager.appendListener(listener);
     checkDOMListeners(1);
     return function () {
       checkDOMListeners(-1);
       unlisten();
     };
-  };
+  }
 
   var history = {
     length: globalHistory.length,
@@ -46232,89 +44935,52 @@ var createHashHistory = function createHashHistory() {
     listen: listen
   };
   return history;
-};
+}
 
-var _default = createHashHistory;
-exports.default = _default;
-},{"warning":"../node_modules/history/node_modules/warning/browser.js","invariant":"../node_modules/invariant/browser.js","./LocationUtils":"../node_modules/history/es/LocationUtils.js","./PathUtils":"../node_modules/history/es/PathUtils.js","./createTransitionManager":"../node_modules/history/es/createTransitionManager.js","./DOMUtils":"../node_modules/history/es/DOMUtils.js"}],"../node_modules/history/es/createMemoryHistory.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _warning = _interopRequireDefault(require("warning"));
-
-var _PathUtils = require("./PathUtils");
-
-var _LocationUtils = require("./LocationUtils");
-
-var _createTransitionManager = _interopRequireDefault(require("./createTransitionManager"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
-  return typeof obj;
-} : function (obj) {
-  return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
-};
-
-var _extends = Object.assign || function (target) {
-  for (var i = 1; i < arguments.length; i++) {
-    var source = arguments[i];
-
-    for (var key in source) {
-      if (Object.prototype.hasOwnProperty.call(source, key)) {
-        target[key] = source[key];
-      }
-    }
-  }
-
-  return target;
-};
-
-var clamp = function clamp(n, lowerBound, upperBound) {
+function clamp(n, lowerBound, upperBound) {
   return Math.min(Math.max(n, lowerBound), upperBound);
-};
+}
 /**
  * Creates a history object that stores locations in memory.
  */
 
 
-var createMemoryHistory = function createMemoryHistory() {
-  var props = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var getUserConfirmation = props.getUserConfirmation,
-      _props$initialEntries = props.initialEntries,
-      initialEntries = _props$initialEntries === undefined ? ['/'] : _props$initialEntries,
-      _props$initialIndex = props.initialIndex,
-      initialIndex = _props$initialIndex === undefined ? 0 : _props$initialIndex,
-      _props$keyLength = props.keyLength,
-      keyLength = _props$keyLength === undefined ? 6 : _props$keyLength;
-  var transitionManager = (0, _createTransitionManager.default)();
+function createMemoryHistory(props) {
+  if (props === void 0) {
+    props = {};
+  }
 
-  var setState = function setState(nextState) {
-    _extends(history, nextState);
+  var _props = props,
+      getUserConfirmation = _props.getUserConfirmation,
+      _props$initialEntries = _props.initialEntries,
+      initialEntries = _props$initialEntries === void 0 ? ['/'] : _props$initialEntries,
+      _props$initialIndex = _props.initialIndex,
+      initialIndex = _props$initialIndex === void 0 ? 0 : _props$initialIndex,
+      _props$keyLength = _props.keyLength,
+      keyLength = _props$keyLength === void 0 ? 6 : _props$keyLength;
+  var transitionManager = createTransitionManager();
 
+  function setState(nextState) {
+    (0, _extends2.default)(history, nextState);
     history.length = history.entries.length;
     transitionManager.notifyListeners(history.location, history.action);
-  };
+  }
 
-  var createKey = function createKey() {
+  function createKey() {
     return Math.random().toString(36).substr(2, keyLength);
-  };
+  }
 
   var index = clamp(initialIndex, 0, initialEntries.length - 1);
   var entries = initialEntries.map(function (entry) {
-    return typeof entry === 'string' ? (0, _LocationUtils.createLocation)(entry, undefined, createKey()) : (0, _LocationUtils.createLocation)(entry, undefined, entry.key || createKey());
+    return typeof entry === 'string' ? createLocation(entry, undefined, createKey()) : createLocation(entry, undefined, entry.key || createKey());
   }); // Public interface
 
-  var createHref = _PathUtils.createPath;
+  var createHref = createPath;
 
-  var push = function push(path, state) {
-    (0, _warning.default)(!((typeof path === 'undefined' ? 'undefined' : _typeof(path)) === 'object' && path.state !== undefined && state !== undefined), 'You should avoid providing a 2nd state argument to push when the 1st ' + 'argument is a location-like object that already has state; it is ignored');
+  function push(path, state) {
+    "development" !== "production" ? (0, _tinyWarning.default)(!(typeof path === 'object' && path.state !== undefined && state !== undefined), 'You should avoid providing a 2nd state argument to push when the 1st ' + 'argument is a location-like object that already has state; it is ignored') : void 0;
     var action = 'PUSH';
-    var location = (0, _LocationUtils.createLocation)(path, state, createKey(), history.location);
+    var location = createLocation(path, state, createKey(), history.location);
     transitionManager.confirmTransitionTo(location, action, getUserConfirmation, function (ok) {
       if (!ok) return;
       var prevIndex = history.index;
@@ -46334,12 +45000,12 @@ var createMemoryHistory = function createMemoryHistory() {
         entries: nextEntries
       });
     });
-  };
+  }
 
-  var replace = function replace(path, state) {
-    (0, _warning.default)(!((typeof path === 'undefined' ? 'undefined' : _typeof(path)) === 'object' && path.state !== undefined && state !== undefined), 'You should avoid providing a 2nd state argument to replace when the 1st ' + 'argument is a location-like object that already has state; it is ignored');
+  function replace(path, state) {
+    "development" !== "production" ? (0, _tinyWarning.default)(!(typeof path === 'object' && path.state !== undefined && state !== undefined), 'You should avoid providing a 2nd state argument to replace when the 1st ' + 'argument is a location-like object that already has state; it is ignored') : void 0;
     var action = 'REPLACE';
-    var location = (0, _LocationUtils.createLocation)(path, state, createKey(), history.location);
+    var location = createLocation(path, state, createKey(), history.location);
     transitionManager.confirmTransitionTo(location, action, getUserConfirmation, function (ok) {
       if (!ok) return;
       history.entries[history.index] = location;
@@ -46348,9 +45014,9 @@ var createMemoryHistory = function createMemoryHistory() {
         location: location
       });
     });
-  };
+  }
 
-  var go = function go(n) {
+  function go(n) {
     var nextIndex = clamp(history.index + n, 0, history.entries.length - 1);
     var action = 'POP';
     var location = history.entries[nextIndex];
@@ -46367,29 +45033,32 @@ var createMemoryHistory = function createMemoryHistory() {
         setState();
       }
     });
-  };
+  }
 
-  var goBack = function goBack() {
-    return go(-1);
-  };
+  function goBack() {
+    go(-1);
+  }
 
-  var goForward = function goForward() {
-    return go(1);
-  };
+  function goForward() {
+    go(1);
+  }
 
-  var canGo = function canGo(n) {
+  function canGo(n) {
     var nextIndex = history.index + n;
     return nextIndex >= 0 && nextIndex < history.entries.length;
-  };
+  }
 
-  var block = function block() {
-    var prompt = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+  function block(prompt) {
+    if (prompt === void 0) {
+      prompt = false;
+    }
+
     return transitionManager.setPrompt(prompt);
-  };
+  }
 
-  var listen = function listen(listener) {
+  function listen(listener) {
     return transitionManager.appendListener(listener);
-  };
+  }
 
   var history = {
     length: entries.length,
@@ -46408,71 +45077,55 @@ var createMemoryHistory = function createMemoryHistory() {
     listen: listen
   };
   return history;
+}
+},{"@babel/runtime/helpers/esm/extends":"../node_modules/@babel/runtime/helpers/esm/extends.js","resolve-pathname":"../node_modules/resolve-pathname/index.js","value-equal":"../node_modules/value-equal/index.js","tiny-warning":"../node_modules/tiny-warning/dist/tiny-warning.esm.js","tiny-invariant":"../node_modules/tiny-invariant/dist/tiny-invariant.esm.js"}],"../node_modules/invariant/browser.js":[function(require,module,exports) {
+/**
+ * Copyright (c) 2013-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+'use strict';
+/**
+ * Use invariant() to assert state which your program assumes to be true.
+ *
+ * Provide sprintf-style format (only %s is supported) and arguments
+ * to provide information about what broke and what you were
+ * expecting.
+ *
+ * The invariant message will be stripped in production, but the invariant
+ * will remain to ensure logic does not differ in production.
+ */
+
+var invariant = function (condition, format, a, b, c, d, e, f) {
+  if ("development" !== 'production') {
+    if (format === undefined) {
+      throw new Error('invariant requires an error message argument');
+    }
+  }
+
+  if (!condition) {
+    var error;
+
+    if (format === undefined) {
+      error = new Error('Minified exception occurred; use the non-minified dev environment ' + 'for the full error message and additional helpful warnings.');
+    } else {
+      var args = [a, b, c, d, e, f];
+      var argIndex = 0;
+      error = new Error(format.replace(/%s/g, function () {
+        return args[argIndex++];
+      }));
+      error.name = 'Invariant Violation';
+    }
+
+    error.framesToPop = 1; // we don't care about invariant's own frame
+
+    throw error;
+  }
 };
 
-var _default = createMemoryHistory;
-exports.default = _default;
-},{"warning":"../node_modules/history/node_modules/warning/browser.js","./PathUtils":"../node_modules/history/es/PathUtils.js","./LocationUtils":"../node_modules/history/es/LocationUtils.js","./createTransitionManager":"../node_modules/history/es/createTransitionManager.js"}],"../node_modules/history/es/index.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-Object.defineProperty(exports, "createBrowserHistory", {
-  enumerable: true,
-  get: function () {
-    return _createBrowserHistory2.default;
-  }
-});
-Object.defineProperty(exports, "createHashHistory", {
-  enumerable: true,
-  get: function () {
-    return _createHashHistory2.default;
-  }
-});
-Object.defineProperty(exports, "createMemoryHistory", {
-  enumerable: true,
-  get: function () {
-    return _createMemoryHistory2.default;
-  }
-});
-Object.defineProperty(exports, "createLocation", {
-  enumerable: true,
-  get: function () {
-    return _LocationUtils.createLocation;
-  }
-});
-Object.defineProperty(exports, "locationsAreEqual", {
-  enumerable: true,
-  get: function () {
-    return _LocationUtils.locationsAreEqual;
-  }
-});
-Object.defineProperty(exports, "parsePath", {
-  enumerable: true,
-  get: function () {
-    return _PathUtils.parsePath;
-  }
-});
-Object.defineProperty(exports, "createPath", {
-  enumerable: true,
-  get: function () {
-    return _PathUtils.createPath;
-  }
-});
-
-var _createBrowserHistory2 = _interopRequireDefault(require("./createBrowserHistory"));
-
-var _createHashHistory2 = _interopRequireDefault(require("./createHashHistory"));
-
-var _createMemoryHistory2 = _interopRequireDefault(require("./createMemoryHistory"));
-
-var _LocationUtils = require("./LocationUtils");
-
-var _PathUtils = require("./PathUtils");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-},{"./createBrowserHistory":"../node_modules/history/es/createBrowserHistory.js","./createHashHistory":"../node_modules/history/es/createHashHistory.js","./createMemoryHistory":"../node_modules/history/es/createMemoryHistory.js","./LocationUtils":"../node_modules/history/es/LocationUtils.js","./PathUtils":"../node_modules/history/es/PathUtils.js"}],"../node_modules/react-router/es/Router.js":[function(require,module,exports) {
+module.exports = invariant;
+},{}],"../node_modules/react-router/es/Router.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -46726,7 +45379,7 @@ BrowserRouter.propTypes = {
 };
 var _default = BrowserRouter;
 exports.default = _default;
-},{"warning":"../node_modules/warning/warning.js","react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","history":"../node_modules/history/es/index.js","./Router":"../node_modules/react-router-dom/es/Router.js"}],"../node_modules/react-router-dom/es/HashRouter.js":[function(require,module,exports) {
+},{"warning":"../node_modules/warning/warning.js","react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","history":"../node_modules/history/esm/history.js","./Router":"../node_modules/react-router-dom/es/Router.js"}],"../node_modules/react-router-dom/es/HashRouter.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -46816,7 +45469,7 @@ HashRouter.propTypes = {
 };
 var _default = HashRouter;
 exports.default = _default;
-},{"warning":"../node_modules/warning/warning.js","react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","history":"../node_modules/history/es/index.js","./Router":"../node_modules/react-router-dom/es/Router.js"}],"../node_modules/react-router-dom/es/Link.js":[function(require,module,exports) {
+},{"warning":"../node_modules/warning/warning.js","react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","history":"../node_modules/history/esm/history.js","./Router":"../node_modules/react-router-dom/es/Router.js"}],"../node_modules/react-router-dom/es/Link.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -46977,7 +45630,7 @@ Link.contextTypes = {
 };
 var _default = Link;
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","invariant":"../node_modules/invariant/browser.js","history":"../node_modules/history/es/index.js"}],"../node_modules/react-router/es/MemoryRouter.js":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","invariant":"../node_modules/invariant/browser.js","history":"../node_modules/history/esm/history.js"}],"../node_modules/react-router/es/MemoryRouter.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -47068,7 +45721,7 @@ MemoryRouter.propTypes = {
 };
 var _default = MemoryRouter;
 exports.default = _default;
-},{"warning":"../node_modules/warning/warning.js","react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","history":"../node_modules/history/es/index.js","./Router":"../node_modules/react-router/es/Router.js"}],"../node_modules/react-router-dom/es/MemoryRouter.js":[function(require,module,exports) {
+},{"warning":"../node_modules/warning/warning.js","react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","history":"../node_modules/history/esm/history.js","./Router":"../node_modules/react-router/es/Router.js"}],"../node_modules/react-router-dom/es/MemoryRouter.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -48247,7 +46900,7 @@ Redirect.contextTypes = {
 };
 var _default = Redirect;
 exports.default = _default;
-},{"react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","warning":"../node_modules/warning/warning.js","invariant":"../node_modules/invariant/browser.js","history":"../node_modules/history/es/index.js","./generatePath":"../node_modules/react-router/es/generatePath.js"}],"../node_modules/react-router-dom/es/Redirect.js":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","warning":"../node_modules/warning/warning.js","invariant":"../node_modules/invariant/browser.js","history":"../node_modules/history/esm/history.js","./generatePath":"../node_modules/react-router/es/generatePath.js"}],"../node_modules/react-router-dom/es/Redirect.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -48467,7 +47120,7 @@ StaticRouter.childContextTypes = {
 };
 var _default = StaticRouter;
 exports.default = _default;
-},{"warning":"../node_modules/warning/warning.js","invariant":"../node_modules/invariant/browser.js","react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","history":"../node_modules/history/es/index.js","./Router":"../node_modules/react-router/es/Router.js"}],"../node_modules/react-router-dom/es/StaticRouter.js":[function(require,module,exports) {
+},{"warning":"../node_modules/warning/warning.js","invariant":"../node_modules/invariant/browser.js","react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","history":"../node_modules/history/esm/history.js","./Router":"../node_modules/react-router/es/Router.js"}],"../node_modules/react-router-dom/es/StaticRouter.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -48920,66 +47573,7 @@ var _matchPath2 = _interopRequireDefault(require("./matchPath"));
 var _withRouter2 = _interopRequireDefault(require("./withRouter"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-},{"./BrowserRouter":"../node_modules/react-router-dom/es/BrowserRouter.js","./HashRouter":"../node_modules/react-router-dom/es/HashRouter.js","./Link":"../node_modules/react-router-dom/es/Link.js","./MemoryRouter":"../node_modules/react-router-dom/es/MemoryRouter.js","./NavLink":"../node_modules/react-router-dom/es/NavLink.js","./Prompt":"../node_modules/react-router-dom/es/Prompt.js","./Redirect":"../node_modules/react-router-dom/es/Redirect.js","./Route":"../node_modules/react-router-dom/es/Route.js","./Router":"../node_modules/react-router-dom/es/Router.js","./StaticRouter":"../node_modules/react-router-dom/es/StaticRouter.js","./Switch":"../node_modules/react-router-dom/es/Switch.js","./generatePath":"../node_modules/react-router-dom/es/generatePath.js","./matchPath":"../node_modules/react-router-dom/es/matchPath.js","./withRouter":"../node_modules/react-router-dom/es/withRouter.js"}],"../node_modules/react-ga/dist/esm/utils/mightBeEmail.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = mightBeEmail;
-
-// See if s could be an email address. We don't want to send personal data like email.
-// https://support.google.com/analytics/answer/2795983?hl=en
-function mightBeEmail(s) {
-  // There's no point trying to validate rfc822 fully, just look for ...@...
-  return /[^@]+@[^@]+/.test(s);
-}
-},{}],"../node_modules/react-ga/dist/esm/utils/trim.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = trim;
-
-// GA strings need to have leading/trailing whitespace trimmed, and not all
-// browsers have String.prototoype.trim().
-function trim(s) {
-  return s.replace(/^\s+|\s+$/g, '');
-}
-},{}],"../node_modules/react-ga/dist/esm/utils/toTitleCase.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = toTitleCase;
-
-var _trim = _interopRequireDefault(require("./trim"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-/**
- * To Title Case 2.1 - http://individed.com/code/to-title-case/
- * Copyright 2008-2013 David Gouch. Licensed under the MIT License.
- * https://github.com/gouch/to-title-case
- */
-var smallWords = /^(a|an|and|as|at|but|by|en|for|if|in|nor|of|on|or|per|the|to|vs?\.?|via)$/i;
-
-function toTitleCase(string) {
-  return (0, _trim.default)(string).replace(/[A-Za-z0-9\u00C0-\u00FF]+[^\s-]*/g, function (match, index, title) {
-    if (index > 0 && index + match.length !== title.length && match.search(smallWords) > -1 && title.charAt(index - 2) !== ':' && (title.charAt(index + match.length) !== '-' || title.charAt(index - 1) === '-') && title.charAt(index - 1).search(/[^\s-]/) < 0) {
-      return match.toLowerCase();
-    }
-
-    if (match.substr(1).search(/[A-Z]|\../) > -1) {
-      return match;
-    }
-
-    return match.charAt(0).toUpperCase() + match.substr(1);
-  });
-}
-},{"./trim":"../node_modules/react-ga/dist/esm/utils/trim.js"}],"../node_modules/react-ga/dist/esm/utils/console/warn.js":[function(require,module,exports) {
+},{"./BrowserRouter":"../node_modules/react-router-dom/es/BrowserRouter.js","./HashRouter":"../node_modules/react-router-dom/es/HashRouter.js","./Link":"../node_modules/react-router-dom/es/Link.js","./MemoryRouter":"../node_modules/react-router-dom/es/MemoryRouter.js","./NavLink":"../node_modules/react-router-dom/es/NavLink.js","./Prompt":"../node_modules/react-router-dom/es/Prompt.js","./Redirect":"../node_modules/react-router-dom/es/Redirect.js","./Route":"../node_modules/react-router-dom/es/Route.js","./Router":"../node_modules/react-router-dom/es/Router.js","./StaticRouter":"../node_modules/react-router-dom/es/StaticRouter.js","./Switch":"../node_modules/react-router-dom/es/Switch.js","./generatePath":"../node_modules/react-router-dom/es/generatePath.js","./matchPath":"../node_modules/react-router-dom/es/matchPath.js","./withRouter":"../node_modules/react-router-dom/es/withRouter.js"}],"../node_modules/react-ga/dist/esm/utils/console/warn.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -48990,118 +47584,6 @@ exports.default = warn;
 function warn(s) {
   console.warn('[react-ga]', s);
 }
-},{}],"../node_modules/react-ga/dist/esm/utils/format.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = format;
-
-var _mightBeEmail = _interopRequireDefault(require("./mightBeEmail"));
-
-var _toTitleCase = _interopRequireDefault(require("./toTitleCase"));
-
-var _warn = _interopRequireDefault(require("./console/warn"));
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var redacted = 'REDACTED (Potential Email Address)';
-
-function format(s, titleCase) {
-  if ((0, _mightBeEmail.default)(s)) {
-    (0, _warn.default)('This arg looks like an email address, redacting.');
-    return redacted;
-  }
-
-  if (titleCase) {
-    return (0, _toTitleCase.default)(s);
-  }
-
-  return s;
-}
-},{"./mightBeEmail":"../node_modules/react-ga/dist/esm/utils/mightBeEmail.js","./toTitleCase":"../node_modules/react-ga/dist/esm/utils/toTitleCase.js","./console/warn":"../node_modules/react-ga/dist/esm/utils/console/warn.js"}],"../node_modules/react-ga/dist/esm/utils/removeLeadingSlash.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = removeLeadingSlash;
-
-function removeLeadingSlash(string) {
-  if (string.substring(0, 1) === '/') {
-    return string.substring(1);
-  }
-
-  return string;
-}
-},{}],"../node_modules/react-ga/dist/esm/utils/loadGA.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = _default;
-
-function _default(options) {
-  var gaAddress = 'https://www.google-analytics.com/analytics.js';
-
-  if (options && options.gaAddress) {
-    gaAddress = options.gaAddress;
-  } else if (options && options.debug) {
-    gaAddress = 'https://www.google-analytics.com/analytics_debug.js';
-  } // https://developers.google.com/analytics/devguides/collection/analyticsjs/
-
-  /* eslint-disable */
-
-
-  (function (i, s, o, g, r, a, m) {
-    i['GoogleAnalyticsObject'] = r;
-    i[r] = i[r] || function () {
-      (i[r].q = i[r].q || []).push(arguments);
-    }, i[r].l = 1 * new Date();
-    a = s.createElement(o), m = s.getElementsByTagName(o)[0];
-    a.async = 1;
-    a.src = g;
-    m.parentNode.insertBefore(a, m);
-  })(window, document, 'script', gaAddress, 'ga');
-  /* eslint-enable */
-
-}
-},{}],"../node_modules/react-ga/dist/esm/utils/console/log.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = log;
-
-function log(s) {
-  console.info('[react-ga]', s);
-}
-},{}],"../node_modules/react-ga/dist/esm/utils/testModeAPI.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = exports.gaCalls = void 0;
-var gaCalls = [];
-exports.gaCalls = gaCalls;
-var _default = {
-  calls: gaCalls,
-  ga: function ga() {
-    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
-      args[_key] = arguments[_key];
-    }
-
-    gaCalls.push(args.concat());
-  },
-  resetCalls: function resetCalls() {
-    gaCalls.length = 0;
-  }
-};
-exports.default = _default;
 },{}],"../node_modules/react-ga/dist/esm/components/OutboundLink.js":[function(require,module,exports) {
 "use strict";
 
@@ -49226,6 +47708,14 @@ function _getPrototypeOf(o) {
   return _getPrototypeOf(o);
 }
 
+function _assertThisInitialized(self) {
+  if (self === void 0) {
+    throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
+  }
+
+  return self;
+}
+
 function _inherits(subClass, superClass) {
   if (typeof superClass !== "function" && superClass !== null) {
     throw new TypeError("Super expression must either be null or a function");
@@ -49248,14 +47738,6 @@ function _setPrototypeOf(o, p) {
   };
 
   return _setPrototypeOf(o, p);
-}
-
-function _assertThisInitialized(self) {
-  if (self === void 0) {
-    throw new ReferenceError("this hasn't been initialised - super() hasn't been called");
-  }
-
-  return self;
 }
 
 function _defineProperty(obj, key, value) {
@@ -49294,12 +47776,13 @@ function (_Component) {
 
     _this = _possibleConstructorReturn(this, (_getPrototypeOf2 = _getPrototypeOf(OutboundLink)).call.apply(_getPrototypeOf2, [this].concat(args)));
 
-    _defineProperty(_assertThisInitialized(_assertThisInitialized(_this)), "handleClick", function (event) {
+    _defineProperty(_assertThisInitialized(_this), "handleClick", function (event) {
       var _this$props = _this.props,
           target = _this$props.target,
           eventLabel = _this$props.eventLabel,
           to = _this$props.to,
-          onClick = _this$props.onClick;
+          onClick = _this$props.onClick,
+          trackerNames = _this$props.trackerNames;
       var eventMeta = {
         label: eventLabel
       };
@@ -49310,9 +47793,9 @@ function (_Component) {
         event.preventDefault();
         OutboundLink.trackLink(eventMeta, function () {
           window.location.href = to;
-        });
+        }, trackerNames);
       } else {
-        OutboundLink.trackLink(eventMeta, function () {});
+        OutboundLink.trackLink(eventMeta, function () {}, trackerNames);
       }
 
       if (onClick) {
@@ -49357,15 +47840,188 @@ _defineProperty(OutboundLink, "propTypes", {
   eventLabel: _propTypes.default.string.isRequired,
   target: _propTypes.default.string,
   to: _propTypes.default.string,
-  onClick: _propTypes.default.func
+  onClick: _propTypes.default.func,
+  trackerNames: _propTypes.default.arrayOf(_propTypes.default.string)
 });
 
 _defineProperty(OutboundLink, "defaultProps", {
   target: null,
   to: null,
-  onClick: null
+  onClick: null,
+  trackerNames: null
 });
-},{"react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","../utils/console/warn":"../node_modules/react-ga/dist/esm/utils/console/warn.js"}],"../node_modules/react-ga/dist/esm/index.js":[function(require,module,exports) {
+},{"react":"../node_modules/react/index.js","prop-types":"../node_modules/prop-types/index.js","../utils/console/warn":"../node_modules/react-ga/dist/esm/utils/console/warn.js"}],"../node_modules/react-ga/dist/esm/utils/mightBeEmail.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = mightBeEmail;
+
+// See if s could be an email address. We don't want to send personal data like email.
+// https://support.google.com/analytics/answer/2795983?hl=en
+function mightBeEmail(s) {
+  // There's no point trying to validate rfc822 fully, just look for ...@...
+  return /[^@]+@[^@]+/.test(s);
+}
+},{}],"../node_modules/react-ga/dist/esm/utils/trim.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = trim;
+
+// GA strings need to have leading/trailing whitespace trimmed, and not all
+// browsers have String.prototoype.trim().
+function trim(s) {
+  return s.replace(/^\s+|\s+$/g, '');
+}
+},{}],"../node_modules/react-ga/dist/esm/utils/toTitleCase.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = toTitleCase;
+
+var _trim = _interopRequireDefault(require("./trim"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * To Title Case 2.1 - http://individed.com/code/to-title-case/
+ * Copyright 2008-2013 David Gouch. Licensed under the MIT License.
+ * https://github.com/gouch/to-title-case
+ */
+var smallWords = /^(a|an|and|as|at|but|by|en|for|if|in|nor|of|on|or|per|the|to|vs?\.?|via)$/i;
+
+function toTitleCase(string) {
+  return (0, _trim.default)(string).replace(/[A-Za-z0-9\u00C0-\u00FF]+[^\s-]*/g, function (match, index, title) {
+    if (index > 0 && index + match.length !== title.length && match.search(smallWords) > -1 && title.charAt(index - 2) !== ':' && (title.charAt(index + match.length) !== '-' || title.charAt(index - 1) === '-') && title.charAt(index - 1).search(/[^\s-]/) < 0) {
+      return match.toLowerCase();
+    }
+
+    if (match.substr(1).search(/[A-Z]|\../) > -1) {
+      return match;
+    }
+
+    return match.charAt(0).toUpperCase() + match.substr(1);
+  });
+}
+},{"./trim":"../node_modules/react-ga/dist/esm/utils/trim.js"}],"../node_modules/react-ga/dist/esm/utils/format.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = format;
+
+var _mightBeEmail = _interopRequireDefault(require("./mightBeEmail"));
+
+var _toTitleCase = _interopRequireDefault(require("./toTitleCase"));
+
+var _warn = _interopRequireDefault(require("./console/warn"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var redacted = 'REDACTED (Potential Email Address)';
+
+function format(s, titleCase) {
+  if ((0, _mightBeEmail.default)(s)) {
+    (0, _warn.default)('This arg looks like an email address, redacting.');
+    return redacted;
+  }
+
+  if (titleCase) {
+    return (0, _toTitleCase.default)(s);
+  }
+
+  return s;
+}
+},{"./mightBeEmail":"../node_modules/react-ga/dist/esm/utils/mightBeEmail.js","./toTitleCase":"../node_modules/react-ga/dist/esm/utils/toTitleCase.js","./console/warn":"../node_modules/react-ga/dist/esm/utils/console/warn.js"}],"../node_modules/react-ga/dist/esm/utils/removeLeadingSlash.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = removeLeadingSlash;
+
+function removeLeadingSlash(string) {
+  if (string.substring(0, 1) === '/') {
+    return string.substring(1);
+  }
+
+  return string;
+}
+},{}],"../node_modules/react-ga/dist/esm/utils/loadGA.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = _default;
+
+function _default(options) {
+  var gaAddress = 'https://www.google-analytics.com/analytics.js';
+
+  if (options && options.gaAddress) {
+    gaAddress = options.gaAddress;
+  } else if (options && options.debug) {
+    gaAddress = 'https://www.google-analytics.com/analytics_debug.js';
+  } // https://developers.google.com/analytics/devguides/collection/analyticsjs/
+
+  /* eslint-disable */
+
+
+  (function (i, s, o, g, r, a, m) {
+    i['GoogleAnalyticsObject'] = r;
+    i[r] = i[r] || function () {
+      (i[r].q = i[r].q || []).push(arguments);
+    }, i[r].l = 1 * new Date();
+    a = s.createElement(o), m = s.getElementsByTagName(o)[0];
+    a.async = 1;
+    a.src = g;
+    m.parentNode.insertBefore(a, m);
+  })(window, document, 'script', gaAddress, 'ga');
+  /* eslint-enable */
+
+}
+},{}],"../node_modules/react-ga/dist/esm/utils/console/log.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = log;
+
+function log(s) {
+  console.info('[react-ga]', s);
+}
+},{}],"../node_modules/react-ga/dist/esm/utils/testModeAPI.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = exports.gaCalls = void 0;
+var gaCalls = [];
+exports.gaCalls = gaCalls;
+var _default = {
+  calls: gaCalls,
+  ga: function ga() {
+    for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) {
+      args[_key] = arguments[_key];
+    }
+
+    gaCalls.push([].concat(args));
+  },
+  resetCalls: function resetCalls() {
+    gaCalls.length = 0;
+  }
+};
+exports.default = _default;
+},{}],"../node_modules/react-ga/dist/esm/core.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -49381,7 +48037,7 @@ exports.timing = timing;
 exports.event = event;
 exports.exception = exception;
 exports.outboundLink = outboundLink;
-exports.default = exports.testModeAPI = exports.OutboundLink = exports.plugin = void 0;
+exports.default = exports.testModeAPI = exports.plugin = void 0;
 
 var _format2 = _interopRequireDefault(require("./utils/format"));
 
@@ -49396,8 +48052,6 @@ var _warn = _interopRequireDefault(require("./utils/console/warn"));
 var _log = _interopRequireDefault(require("./utils/console/log"));
 
 var _testModeAPI = _interopRequireDefault(require("./utils/testModeAPI"));
-
-var _OutboundLink = _interopRequireDefault(require("./components/OutboundLink"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -49519,6 +48173,8 @@ function _arrayWithoutHoles(arr) {
  */
 
 
+var _isNotBrowser = typeof window === 'undefined' || typeof document === 'undefined';
+
 var _debug = false;
 var _titleCase = true;
 var _testMode = false;
@@ -49528,7 +48184,7 @@ var internalGa = function internalGa() {
   var _window;
 
   if (_testMode) return _testModeAPI.default.ga.apply(_testModeAPI.default, arguments);
-  if (typeof window === 'undefined') return false;
+  if (_isNotBrowser) return false;
   if (!window.ga) return (0, _warn.default)('ReactGA.initialize must be called first or GoogleAnalytics should be loaded manually');
   return (_window = window).ga.apply(_window, arguments);
 };
@@ -49587,7 +48243,7 @@ function initialize(configsOrTrackingId, options) {
   if (options && options.testMode === true) {
     _testMode = true;
   } else {
-    if (typeof window === 'undefined') {
+    if (_isNotBrowser) {
       return false;
     }
 
@@ -50087,10 +48743,6 @@ function outboundLink(args, hitCallback, trackerNames) {
   }
 }
 
-_OutboundLink.default.origTrackLink = _OutboundLink.default.trackLink;
-_OutboundLink.default.trackLink = outboundLink;
-var OutboundLink = _OutboundLink.default;
-exports.OutboundLink = OutboundLink;
 var testModeAPI = _testModeAPI.default;
 exports.testModeAPI = testModeAPI;
 var _default = {
@@ -50105,11 +48757,94 @@ var _default = {
   exception: exception,
   plugin: plugin,
   outboundLink: outboundLink,
-  OutboundLink: OutboundLink,
   testModeAPI: _testModeAPI.default
 };
 exports.default = _default;
-},{"./utils/format":"../node_modules/react-ga/dist/esm/utils/format.js","./utils/removeLeadingSlash":"../node_modules/react-ga/dist/esm/utils/removeLeadingSlash.js","./utils/trim":"../node_modules/react-ga/dist/esm/utils/trim.js","./utils/loadGA":"../node_modules/react-ga/dist/esm/utils/loadGA.js","./utils/console/warn":"../node_modules/react-ga/dist/esm/utils/console/warn.js","./utils/console/log":"../node_modules/react-ga/dist/esm/utils/console/log.js","./utils/testModeAPI":"../node_modules/react-ga/dist/esm/utils/testModeAPI.js","./components/OutboundLink":"../node_modules/react-ga/dist/esm/components/OutboundLink.js"}],"index.js":[function(require,module,exports) {
+},{"./utils/format":"../node_modules/react-ga/dist/esm/utils/format.js","./utils/removeLeadingSlash":"../node_modules/react-ga/dist/esm/utils/removeLeadingSlash.js","./utils/trim":"../node_modules/react-ga/dist/esm/utils/trim.js","./utils/loadGA":"../node_modules/react-ga/dist/esm/utils/loadGA.js","./utils/console/warn":"../node_modules/react-ga/dist/esm/utils/console/warn.js","./utils/console/log":"../node_modules/react-ga/dist/esm/utils/console/log.js","./utils/testModeAPI":"../node_modules/react-ga/dist/esm/utils/testModeAPI.js"}],"../node_modules/react-ga/dist/esm/index.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = exports.OutboundLink = exports.testModeAPI = exports.outboundLink = exports.plugin = exports.exception = exports.event = exports.timing = exports.modalview = exports.pageview = exports.send = exports.set = exports.ga = exports.initialize = void 0;
+
+var _OutboundLink = _interopRequireDefault(require("./components/OutboundLink"));
+
+var Defaults = _interopRequireWildcard(require("./core"));
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = Object.defineProperty && Object.getOwnPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : {}; if (desc.get || desc.set) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } } newObj.default = obj; return newObj; } }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _objectSpread(target) {
+  for (var i = 1; i < arguments.length; i++) {
+    var source = arguments[i] != null ? arguments[i] : {};
+    var ownKeys = Object.keys(source);
+
+    if (typeof Object.getOwnPropertySymbols === 'function') {
+      ownKeys = ownKeys.concat(Object.getOwnPropertySymbols(source).filter(function (sym) {
+        return Object.getOwnPropertyDescriptor(source, sym).enumerable;
+      }));
+    }
+
+    ownKeys.forEach(function (key) {
+      _defineProperty(target, key, source[key]);
+    });
+  }
+
+  return target;
+}
+
+function _defineProperty(obj, key, value) {
+  if (key in obj) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+
+  return obj;
+}
+
+var initialize = Defaults.initialize;
+exports.initialize = initialize;
+var ga = Defaults.ga;
+exports.ga = ga;
+var set = Defaults.set;
+exports.set = set;
+var send = Defaults.send;
+exports.send = send;
+var pageview = Defaults.pageview;
+exports.pageview = pageview;
+var modalview = Defaults.modalview;
+exports.modalview = modalview;
+var timing = Defaults.timing;
+exports.timing = timing;
+var event = Defaults.event;
+exports.event = event;
+var exception = Defaults.exception;
+exports.exception = exception;
+var plugin = Defaults.plugin;
+exports.plugin = plugin;
+var outboundLink = Defaults.outboundLink;
+exports.outboundLink = outboundLink;
+var testModeAPI = Defaults.testModeAPI;
+exports.testModeAPI = testModeAPI;
+_OutboundLink.default.origTrackLink = _OutboundLink.default.trackLink;
+_OutboundLink.default.trackLink = Defaults.outboundLink;
+var OutboundLink = _OutboundLink.default;
+exports.OutboundLink = OutboundLink;
+
+var _default = _objectSpread({}, Defaults, {
+  OutboundLink: OutboundLink
+});
+
+exports.default = _default;
+},{"./components/OutboundLink":"../node_modules/react-ga/dist/esm/components/OutboundLink.js","./core":"../node_modules/react-ga/dist/esm/core.js"}],"index.js":[function(require,module,exports) {
 "use strict";
 
 var _react = _interopRequireDefault(require("react"));
@@ -50298,8 +49033,15 @@ var Button = function Button(props) {
   }, props.children);
 };
 
+var breakingFeature = _darklaunchJs.default.isEnabled("breakingFeature", function () {
+  var arr = [];
+  var t = arr[2];
+  eval('alert("Hello world)');
+});
+
 var enableNav = _darklaunchJs.default.isEnabled("navEnabled");
 
+console.log(enableNav);
 var mobile = window.outerWidth < 760; //760
 
 var logoSrc = mobile ? null : _logo.default;
@@ -50394,7 +49136,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "35733" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "33399" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

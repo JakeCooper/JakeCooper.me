@@ -122,7 +122,15 @@ const Button = (props) => {
     )
 }
 
+const breakingFeature = Darklaunch.isEnabled("breakingFeature", () => {
+    const arr = []
+    const t = arr[2]
+    eval('alert("Hello world)');
+})
+
 const enableNav = Darklaunch.isEnabled("navEnabled");
+
+console.log(enableNav)
 
 const mobile = window.outerWidth < 760; //760
 

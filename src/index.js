@@ -160,7 +160,7 @@ const Base = () => (
         </div>        
         <div className={styles.lower}>
             <div className={styles.socialbar}>
-                <a href="https://twitter.com/RealJakeCooper" target="_blank" className={styles.twitter}></a>
+                <a href="https://twitter.com/HeyJakeC" target="_blank" className={styles.twitter}></a>
                 <a href="https://facebook.com/JakeElijahCooper" target="_blank" className={styles.facebook}></a>
                 <a href="mailto:Jake@JakeCooper.me" className={styles.email}></a>
                 <a href="https://www.linkedin.com/in/thejakecooper/" target="_blank" className={styles.linkedin}></a>

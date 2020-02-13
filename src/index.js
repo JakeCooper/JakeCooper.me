@@ -126,9 +126,14 @@ Darklaunch.isEnabled("breakingFeature", () => {
   throw new Error("NewError");
 });
 
+function getCookieValue(a) {
+  var b = document.cookie.match("(^|[^;]+)\\s*" + a + "\\s*=\\s*([^;]+)");
+  return b ? b.pop() : "";
+}
+
 Darklaunch.config({
   id: 1234,
-  role: localStorage.getItem("dl_role")
+  role: getCookieValue("dl_role")
 });
 
 Darklaunch.isEnabled("guardedBreakingFeature", () => {

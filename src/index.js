@@ -131,9 +131,12 @@ function getCookieValue(a) {
   return b ? b.pop() : "";
 }
 
+const mobile = window.outerWidth < 760; //760
+
 Darklaunch.config({
   id: 1234,
-  role: getCookieValue("dl_role")
+  role: getCookieValue("dl_role"),
+  device: mobile ? "mobile" : "web"
 });
 
 Darklaunch.isEnabled("guardedBreakingFeature", () => {
@@ -151,8 +154,6 @@ Darklaunch.isEnabled("guardedBreakingFeature", () => {
 const enableNav = Darklaunch.isEnabled("navEnabled");
 
 console.log(enableNav);
-
-const mobile = window.outerWidth < 760; //760
 
 const logoSrc = mobile ? null : logo;
 

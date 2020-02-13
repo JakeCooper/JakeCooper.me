@@ -122,18 +122,25 @@ const Button = props => {
   );
 };
 
-// const breakingFeature = Darklaunch.isEnabled("breakingFeature", () => {
-//     const arr = []
-//     const t = arr[2]
-//     eval('alert("Hello world)');
-// })
-
-Darklaunch.config({
-  darklaunch_id: 1234
+Darklaunch.isEnabled("breakingFeature", () => {
+  throw new Error("NewError");
 });
 
-Darklaunch.isEnabled("breakingFeature", () => {
-  console.log("BROKEN");
+Darklaunch.config({
+  id: 1234,
+  role: localStorage.getItem("dl_role")
+});
+
+Darklaunch.isEnabled("guardedBreakingFeature", () => {
+  try {
+    (() => {
+      throw new Error("NewError");
+    })();
+  } catch (e) {
+    console.log(
+      `Darklaunch: \n[Feature]: guardedBreakingFeature\n[Stack]: ${e.stack}`
+    );
+  }
 });
 
 const enableNav = Darklaunch.isEnabled("navEnabled");
